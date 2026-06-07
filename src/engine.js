@@ -29,6 +29,7 @@ export function createInitialState(options = {}) {
     direction,
     directionQueue: [],
     apple: apple ? copyCell(apple) : randomFreeCell(initialSnake, randomizer),
+    applesEaten: 0,
     score: 0,
     bestScore,
     status: STATUS.READY,
@@ -110,6 +111,7 @@ export function stepState(state, randomizer = Math.random) {
 
   const nextApple = grows ? randomFreeCell(nextSnake, randomizer) : state.apple;
   const nextScore = grows ? state.score + 1 : state.score;
+  const nextApplesEaten = (state.applesEaten ?? 0) + (grows ? 1 : 0);
   const hasWon = grows && !nextApple;
 
   return {
@@ -118,6 +120,7 @@ export function stepState(state, randomizer = Math.random) {
     direction,
     directionQueue: remainingQueue,
     apple: nextApple,
+    applesEaten: nextApplesEaten,
     score: nextScore,
     bestScore: Math.max(state.bestScore, nextScore),
     status: hasWon ? STATUS.WON : STATUS.RUNNING,
