@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Snake</title>
+    <link rel="stylesheet" href="./src/styles.css">
+  </head>
+  <body>
+    <main class="game-shell" aria-label="Snake">
+      <header class="top-bar">
+        <h1>Snake</h1>
+        <div class="status-pill" id="status-label">Pret</div>
+      </header>
+
+      <section class="score-strip" aria-label="Scores">
+        <div class="stat-block">
+          <span class="stat-label">Score</span>
+          <strong id="score-value">0</strong>
+        </div>
+        <div class="stat-block">
+          <span class="stat-label">Meilleur</span>
+          <strong id="best-value">0</strong>
+        </div>
+        <div class="stat-block">
+          <span class="stat-label">Vitesse</span>
+          <strong id="speed-value">1.0x</strong>
+        </div>
+      </section>
+
+      <section class="board-wrap" aria-label="Plateau">
+        <canvas
+          id="game-canvas"
+          width="480"
+          height="480"
+          tabindex="0"
+          aria-label="Plateau de jeu Snake"
+        ></canvas>
+      </section>
+
+      <section class="control-strip" aria-label="Actions">
+        <button class="control-button primary" type="button" id="play-button">Jouer</button>
+        <button class="control-button" type="button" id="pause-button">Pause</button>
+        <button class="control-button" type="button" id="restart-button">Rejouer</button>
+      </section>
+    </main>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
