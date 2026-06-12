@@ -14,6 +14,7 @@ import { loadBestScore, saveBestScore } from "./storage.js";
 
 const canvas = document.querySelector("#game-canvas");
 const scoreValue = document.querySelector("#score-value");
+const applesValue = document.querySelector("#apples-value");
 const bestValue = document.querySelector("#best-value");
 const speedValue = document.querySelector("#speed-value");
 const statusLabel = document.querySelector("#status-label");
@@ -95,6 +96,7 @@ function handleDirection(direction) {
 
 function updateHud() {
   scoreValue.textContent = String(state.score);
+  applesValue.textContent = String(state.score);
   bestValue.textContent = String(state.bestScore);
   speedValue.textContent = `${(START_DELAY_MS / getTickDelay(state.score)).toFixed(1)}x`;
   statusLabel.textContent = statusText(state.status);

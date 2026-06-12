@@ -6,6 +6,7 @@ import {
   createInitialState,
   getTickDelay,
   queueDirection,
+  resetGame,
   startGame,
   stepState
 } from "../src/engine.js";
@@ -23,6 +24,24 @@ test("the snake grows and scores when it eats an apple", () => {
   assert.equal(nextState.snake.length, 4);
   assert.deepEqual(nextState.snake[0], { x: 10, y: 10 });
   assert.equal(nextState.bestScore, 1);
+});
+
+test("resetting the game clears the apple count", () => {
+  const state = stepState(
+    startGame(
+      createInitialState({
+        apple: { x: 10, y: 10 },
+        bestScore: 3
+      })
+    ),
+    () => 0
+  );
+
+  const resetState = resetGame(state);
+
+  assert.equal(state.score, 1);
+  assert.equal(resetState.score, 0);
+  assert.equal(resetState.bestScore, 3);
 });
 
 test("the direction queue blocks immediate reversal", () => {
