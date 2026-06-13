@@ -28,6 +28,15 @@
         </div>
       </section>
 
+      <section class="speed-strip" aria-label="Vitesse du serpent">
+        <span class="speed-strip-label">Rythme</span>
+        <div class="speed-options" role="group" aria-label="Choix de vitesse">
+          <button class="speed-option selected" type="button" data-speed-key="normal" aria-pressed="true">Normal</button>
+          <button class="speed-option" type="button" data-speed-key="fast" aria-pressed="false">Rapide</button>
+          <button class="speed-option" type="button" data-speed-key="turbo" aria-pressed="false">Turbo</button>
+        </div>
+      </section>
+
       <section class="board-wrap" aria-label="Plateau">
         <canvas
           id="game-canvas"

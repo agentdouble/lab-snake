@@ -6,6 +6,8 @@ import {
   createInitialState,
   getTickDelay,
   queueDirection,
+  resetGame,
+  setSpeedLevel,
   startGame,
   stepState
 } from "../src/engine.js";
@@ -59,4 +61,22 @@ test("the game accelerates without passing the minimum delay", () => {
   assert.equal(getTickDelay(0), 145);
   assert.equal(getTickDelay(10), 95);
   assert.equal(getTickDelay(1000), 62);
+});
+
+test("a faster speed level shortens the movement delay", () => {
+  assert.equal(getTickDelay(0, "fast"), 112);
+  assert.equal(getTickDelay(0, "turbo"), 91);
+  assert.ok(getTickDelay(5, "turbo") < getTickDelay(5, "normal"));
+  assert.equal(getTickDelay(1000, "turbo"), 62);
+});
+
+test("restart preserves the selected speed level", () => {
+  let state = createInitialState();
+
+  state = setSpeedLevel(state, "turbo");
+  const restartedState = resetGame(state);
+
+  assert.equal(restartedState.speedKey, "turbo");
+  assert.equal(restartedState.score, 0);
+  assert.equal(restartedState.status, STATUS.READY);
 });

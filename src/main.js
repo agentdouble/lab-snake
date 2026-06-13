@@ -1,10 +1,13 @@
-import { DIRECTIONS, START_DELAY_MS, STATUS } from "./constants.js";
+import { DIRECTIONS, STATUS } from "./constants.js";
 import {
   createInitialState,
+  getSpeedLevel,
+  getSpeedMultiplier,
   getTickDelay,
   pauseGame,
   queueDirection,
   resetGame,
+  setSpeedLevel,
   startGame,
   stepState
 } from "./engine.js";
@@ -20,6 +23,7 @@ const statusLabel = document.querySelector("#status-label");
 const playButton = document.querySelector("#play-button");
 const pauseButton = document.querySelector("#pause-button");
 const restartButton = document.querySelector("#restart-button");
+const speedButtons = [...document.querySelectorAll("[data-speed-key]")];
 const render = createRenderer(canvas);
 
 let state = createInitialState({ bestScore: loadBestScore() });
@@ -55,7 +59,7 @@ function scheduleTick() {
     return;
   }
 
-  loopTimer = window.setTimeout(runTick, getTickDelay(state.score));
+  loopTimer = window.setTimeout(runTick, getTickDelay(state.score, state.speedKey));
 }
 
 function clearTick() {
@@ -84,6 +88,15 @@ function restart() {
   canvas.focus();
 }
 
+function chooseSpeed(speedKey) {
+  if (state.status === STATUS.RUNNING) {
+    return;
+  }
+
+  setState(setSpeedLevel(state, speedKey));
+  canvas.focus();
+}
+
 function handleDirection(direction) {
   if (state.status === STATUS.READY || state.status === STATUS.PAUSED) {
     state = startGame(state);
@@ -94,12 +107,22 @@ function handleDirection(direction) {
 }
 
 function updateHud() {
+  const speedLevel = getSpeedLevel(state.speedKey);
+
   scoreValue.textContent = String(state.score);
   bestValue.textContent = String(state.bestScore);
-  speedValue.textContent = `${(START_DELAY_MS / getTickDelay(state.score)).toFixed(1)}x`;
+  speedValue.textContent = `${speedLevel.label} ${getSpeedMultiplier(state.score, state.speedKey).toFixed(1)}x`;
   statusLabel.textContent = statusText(state.status);
   playButton.disabled = state.status === STATUS.RUNNING || state.status === STATUS.GAME_OVER || state.status === STATUS.WON;
   pauseButton.disabled = state.status !== STATUS.RUNNING;
+
+  speedButtons.forEach((button) => {
+    const isSelected = button.dataset.speedKey === state.speedKey;
+
+    button.disabled = state.status === STATUS.RUNNING;
+    button.setAttribute("aria-pressed", String(isSelected));
+    button.classList.toggle("selected", isSelected);
+  });
 }
 
 function statusText(status) {
@@ -121,6 +144,10 @@ function statusText(status) {
 playButton.addEventListener("click", play);
 pauseButton.addEventListener("click", pause);
 restartButton.addEventListener("click", restart);
+
+speedButtons.forEach((button) => {
+  button.addEventListener("click", () => chooseSpeed(button.dataset.speedKey));
+});
 
 bindKeyboard(handleDirection);
 bindTouch(canvas, handleDirection);

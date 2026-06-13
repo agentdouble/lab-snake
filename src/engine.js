@@ -1,11 +1,15 @@
 import {
   DELAY_STEP_MS,
+  DEFAULT_SPEED_KEY,
   DIRECTIONS,
   GRID_SIZE,
   MIN_DELAY_MS,
+  SPEED_LEVELS,
   START_DELAY_MS,
   STATUS
 } from "./constants.js";
+
+const SPEED_LEVEL_BY_KEY = Object.freeze(Object.fromEntries(SPEED_LEVELS.map((level) => [level.key, level])));
 
 const DEFAULT_SNAKE = Object.freeze([
   Object.freeze({ x: 9, y: 10 }),
@@ -19,10 +23,12 @@ export function createInitialState(options = {}) {
     randomizer = Math.random,
     snake = DEFAULT_SNAKE,
     direction = DIRECTIONS.RIGHT,
-    apple
+    apple,
+    speedKey = DEFAULT_SPEED_KEY
   } = options;
 
   const initialSnake = snake.map(copyCell);
+  const speedLevel = getSpeedLevel(speedKey);
 
   return {
     snake: initialSnake,
@@ -32,6 +38,7 @@ export function createInitialState(options = {}) {
     score: 0,
     bestScore,
     status: STATUS.READY,
+    speedKey: speedLevel.key,
     ticks: 0
   };
 }
@@ -55,8 +62,22 @@ export function pauseGame(state) {
 export function resetGame(state, options = {}) {
   return createInitialState({
     bestScore: state.bestScore,
+    speedKey: state.speedKey,
     ...options
   });
+}
+
+export function setSpeedLevel(state, speedKey) {
+  const speedLevel = getSpeedLevel(speedKey);
+
+  if (state.speedKey === speedLevel.key) {
+    return state;
+  }
+
+  return {
+    ...state,
+    speedKey: speedLevel.key
+  };
 }
 
 export function queueDirection(state, direction) {
@@ -125,8 +146,19 @@ export function stepState(state, randomizer = Math.random) {
   };
 }
 
-export function getTickDelay(score) {
-  return Math.max(MIN_DELAY_MS, START_DELAY_MS - score * DELAY_STEP_MS);
+export function getTickDelay(score, speedKey = DEFAULT_SPEED_KEY) {
+  const baseDelay = Math.max(MIN_DELAY_MS, START_DELAY_MS - score * DELAY_STEP_MS);
+  const speedLevel = getSpeedLevel(speedKey);
+
+  return Math.max(MIN_DELAY_MS, Math.round(baseDelay / speedLevel.multiplier));
+}
+
+export function getSpeedLevel(speedKey) {
+  return SPEED_LEVEL_BY_KEY[speedKey] ?? SPEED_LEVEL_BY_KEY[DEFAULT_SPEED_KEY];
+}
+
+export function getSpeedMultiplier(score, speedKey = DEFAULT_SPEED_KEY) {
+  return START_DELAY_MS / getTickDelay(score, speedKey);
 }
 
 export function randomFreeCell(occupiedCells, randomizer = Math.random) {
