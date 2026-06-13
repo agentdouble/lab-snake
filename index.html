@@ -13,10 +13,19 @@
         <div class="status-pill" id="status-label">Pret</div>
       </header>
 
+      <section class="mode-strip" aria-label="Mode de jeu">
+        <button class="mode-button is-active" type="button" data-mode="solo" aria-pressed="true">Solo</button>
+        <button class="mode-button" type="button" data-mode="local-multiplayer" aria-pressed="false">Multijoueur local</button>
+      </section>
+
       <section class="score-strip" aria-label="Scores">
         <div class="stat-block">
-          <span class="stat-label">Score</span>
-          <strong id="score-value">0</strong>
+          <span class="stat-label" id="player-one-score-label">Score</span>
+          <strong id="player-one-score-value">0</strong>
+        </div>
+        <div class="stat-block" id="player-two-score-block" hidden>
+          <span class="stat-label">Joueur 2</span>
+          <strong id="player-two-score-value">0</strong>
         </div>
         <div class="stat-block">
           <span class="stat-label">Meilleur</span>
@@ -42,6 +51,17 @@
         <button class="control-button primary" type="button" id="play-button">Jouer</button>
         <button class="control-button" type="button" id="pause-button">Pause</button>
         <button class="control-button" type="button" id="restart-button">Rejouer</button>
+      </section>
+
+      <section class="controls-help" aria-label="Controles">
+        <div class="control-help-item">
+          <strong>Joueur 1</strong>
+          <span>Fleches ou glisser</span>
+        </div>
+        <div class="control-help-item" id="player-two-controls" hidden>
+          <strong>Joueur 2</strong>
+          <span>WASD / ZQSD</span>
+        </div>
       </section>
     </main>
 

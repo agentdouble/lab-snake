@@ -39,13 +39,15 @@ button {
   margin: 0 auto;
   padding: clamp(16px, 4vw, 32px);
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
   gap: 14px;
 }
 
 .top-bar,
+.mode-strip,
 .score-strip,
-.control-strip {
+.control-strip,
+.controls-help {
   width: 100%;
 }
 
@@ -74,9 +76,35 @@ h1 {
   font-weight: 800;
 }
 
+.mode-strip {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.mode-button {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.mode-button.is-active {
+  border-color: rgba(76, 201, 240, 0.7);
+  background: #173748;
+  color: var(--ink);
+}
+
+.mode-button:hover {
+  border-color: var(--cyan);
+}
+
 .score-strip {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
   gap: 8px;
 }
 
@@ -164,11 +192,43 @@ h1 {
   cursor: not-allowed;
 }
 
+.controls-help {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.control-help-item {
+  min-height: 52px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  display: grid;
+  align-content: center;
+  gap: 2px;
+}
+
+.control-help-item strong {
+  font-size: 0.82rem;
+}
+
+.control-help-item span {
+  color: var(--muted);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+[hidden] {
+  display: none !important;
+}
+
 @media (max-width: 480px) {
   .game-shell {
     gap: 10px;
   }
 
+  .mode-strip,
   .score-strip {
     gap: 6px;
   }

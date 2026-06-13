@@ -12,6 +12,16 @@ export const STATUS = Object.freeze({
   WON: "won"
 });
 
+export const GAME_MODES = Object.freeze({
+  SOLO: "solo",
+  LOCAL_MULTIPLAYER: "local-multiplayer"
+});
+
+export const PLAYER_IDS = Object.freeze({
+  ONE: "p1",
+  TWO: "p2"
+});
+
 export const DIRECTIONS = Object.freeze({
   UP: Object.freeze({ x: 0, y: -1, name: "up" }),
   DOWN: Object.freeze({ x: 0, y: 1, name: "down" }),

@@ -6,11 +6,27 @@ const COLORS = Object.freeze({
   snakeHead: "#d8f75c",
   snakeBody: "#4fd06b",
   snakeShadow: "#19724d",
+  playerTwoHead: "#9be7ff",
+  playerTwoBody: "#4cc9f0",
+  playerTwoShadow: "#176d8a",
   apple: "#ef476f",
   appleCore: "#ffd166",
   overlay: "rgba(11, 13, 12, 0.58)",
   text: "#f3f7ee"
 });
+
+const PLAYER_PALETTES = Object.freeze([
+  Object.freeze({
+    head: COLORS.snakeHead,
+    body: COLORS.snakeBody,
+    shadow: COLORS.snakeShadow
+  }),
+  Object.freeze({
+    head: COLORS.playerTwoHead,
+    body: COLORS.playerTwoBody,
+    shadow: COLORS.playerTwoShadow
+  })
+]);
 
 export function createRenderer(canvas) {
   const context = canvas.getContext("2d");
@@ -19,7 +35,9 @@ export function createRenderer(canvas) {
     context.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
     drawBoard(context);
     drawApple(context, state.apple);
-    drawSnake(context, state.snake);
+    state.players.forEach((player, index) => {
+      drawSnake(context, player.snake, PLAYER_PALETTES[index] ?? PLAYER_PALETTES[0]);
+    });
     drawStatus(context, state.status);
   };
 }
@@ -47,13 +65,13 @@ function drawBoard(context) {
   }
 }
 
-function drawSnake(context, snake) {
+function drawSnake(context, snake, palette) {
   snake.forEach((cell, index) => {
     const isHead = index === 0;
-    drawRoundedCell(context, cell, isHead ? COLORS.snakeHead : COLORS.snakeBody, isHead ? 4 : 5);
+    drawRoundedCell(context, cell, isHead ? palette.head : palette.body, isHead ? 4 : 5);
 
     if (isHead) {
-      drawRoundedCell(context, cell, COLORS.snakeShadow, 11);
+      drawRoundedCell(context, cell, palette.shadow, 11);
     }
   });
 }

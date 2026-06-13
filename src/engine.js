@@ -1,39 +1,48 @@
 import {
   DELAY_STEP_MS,
   DIRECTIONS,
+  GAME_MODES,
   GRID_SIZE,
   MIN_DELAY_MS,
+  PLAYER_IDS,
   START_DELAY_MS,
   STATUS
 } from "./constants.js";
 
-const DEFAULT_SNAKE = Object.freeze([
+const DEFAULT_PLAYER_ONE_SNAKE = Object.freeze([
   Object.freeze({ x: 9, y: 10 }),
   Object.freeze({ x: 8, y: 10 }),
   Object.freeze({ x: 7, y: 10 })
+]);
+
+const DEFAULT_PLAYER_TWO_SNAKE = Object.freeze([
+  Object.freeze({ x: 10, y: 9 }),
+  Object.freeze({ x: 11, y: 9 }),
+  Object.freeze({ x: 12, y: 9 })
 ]);
 
 export function createInitialState(options = {}) {
   const {
     bestScore = 0,
     randomizer = Math.random,
-    snake = DEFAULT_SNAKE,
+    mode = GAME_MODES.SOLO,
+    players,
+    snake = DEFAULT_PLAYER_ONE_SNAKE,
     direction = DIRECTIONS.RIGHT,
     apple
   } = options;
 
-  const initialSnake = snake.map(copyCell);
+  const initialPlayers = createInitialPlayers({ mode, players, snake, direction });
+  const occupiedCells = getOccupiedCells(initialPlayers);
 
-  return {
-    snake: initialSnake,
-    direction,
-    directionQueue: [],
-    apple: apple ? copyCell(apple) : randomFreeCell(initialSnake, randomizer),
-    score: 0,
+  return withPlayerAliases({
+    mode,
+    players: initialPlayers,
+    apple: apple ? copyCell(apple) : randomFreeCell(occupiedCells, randomizer),
     bestScore,
     status: STATUS.READY,
     ticks: 0
-  };
+  });
 }
 
 export function startGame(state) {
@@ -55,29 +64,40 @@ export function pauseGame(state) {
 export function resetGame(state, options = {}) {
   return createInitialState({
     bestScore: state.bestScore,
+    mode: state.mode,
     ...options
   });
 }
 
-export function queueDirection(state, direction) {
+export function queueDirection(state, direction, playerId = PLAYER_IDS.ONE) {
   if (!direction || state.status === STATUS.GAME_OVER || state.status === STATUS.WON) {
     return state;
   }
 
-  const latestDirection = state.directionQueue.at(-1) ?? state.direction;
+  const effectivePlayerId = state.mode === GAME_MODES.LOCAL_MULTIPLAYER ? playerId : PLAYER_IDS.ONE;
+  const playerIndex = state.players.findIndex((player) => player.id === effectivePlayerId);
+
+  if (playerIndex < 0) {
+    return state;
+  }
+
+  const player = state.players[playerIndex];
+  const latestDirection = player.directionQueue.at(-1) ?? player.direction;
 
   if (sameDirection(direction, latestDirection) || isOpposite(direction, latestDirection)) {
     return state;
   }
 
-  if (state.directionQueue.length >= 2) {
+  if (player.directionQueue.length >= 2) {
     return state;
   }
 
-  return {
-    ...state,
-    directionQueue: [...state.directionQueue, direction]
-  };
+  const nextPlayers = replacePlayerAt(state.players, playerIndex, {
+    ...player,
+    directionQueue: [...player.directionQueue, direction]
+  });
+
+  return withPlayerAliases({ ...state, players: nextPlayers });
 }
 
 export function stepState(state, randomizer = Math.random) {
@@ -85,44 +105,65 @@ export function stepState(state, randomizer = Math.random) {
     return state;
   }
 
-  const [queuedDirection, ...remainingQueue] = state.directionQueue;
-  const direction = queuedDirection ?? state.direction;
-  const nextHead = addCells(state.snake[0], direction);
-  const grows = state.apple && sameCell(nextHead, state.apple);
-  const collisionBody = grows ? state.snake : state.snake.slice(0, -1);
+  const turns = state.players.map((player) => {
+    const [queuedDirection, ...remainingQueue] = player.directionQueue;
+    const direction = queuedDirection ?? player.direction;
+    const nextHead = addCells(player.snake[0], direction);
 
-  if (isOutsideGrid(nextHead) || containsCell(collisionBody, nextHead)) {
     return {
-      ...state,
+      player,
       direction,
-      directionQueue: remainingQueue,
-      bestScore: Math.max(state.bestScore, state.score),
+      remainingQueue,
+      nextHead,
+      grows: Boolean(state.apple && sameCell(nextHead, state.apple))
+    };
+  });
+
+  if (hasCollision(turns)) {
+    const nextPlayers = turns.map(({ player, direction, remainingQueue }) => ({
+      ...player,
+      direction,
+      directionQueue: remainingQueue
+    }));
+
+    return withPlayerAliases({
+      ...state,
+      players: nextPlayers,
+      bestScore: Math.max(state.bestScore, getTotalScore(nextPlayers)),
       status: STATUS.GAME_OVER,
       ticks: state.ticks + 1
+    });
+  }
+
+  const nextPlayers = turns.map(({ player, direction, remainingQueue, nextHead, grows }) => {
+    const nextSnake = [nextHead, ...player.snake.map(copyCell)];
+
+    if (!grows) {
+      nextSnake.pop();
+    }
+
+    return {
+      ...player,
+      snake: nextSnake,
+      direction,
+      directionQueue: remainingQueue,
+      score: grows ? player.score + 1 : player.score
     };
-  }
+  });
 
-  const nextSnake = [nextHead, ...state.snake.map(copyCell)];
+  const hasEatenApple = turns.some((turn) => turn.grows);
+  const nextApple = hasEatenApple ? randomFreeCell(getOccupiedCells(nextPlayers), randomizer) : state.apple;
+  const nextScore = getTotalScore(nextPlayers);
+  const hasWon = hasEatenApple && !nextApple;
 
-  if (!grows) {
-    nextSnake.pop();
-  }
-
-  const nextApple = grows ? randomFreeCell(nextSnake, randomizer) : state.apple;
-  const nextScore = grows ? state.score + 1 : state.score;
-  const hasWon = grows && !nextApple;
-
-  return {
+  return withPlayerAliases({
     ...state,
-    snake: nextSnake,
-    direction,
-    directionQueue: remainingQueue,
+    players: nextPlayers,
     apple: nextApple,
-    score: nextScore,
     bestScore: Math.max(state.bestScore, nextScore),
     status: hasWon ? STATUS.WON : STATUS.RUNNING,
     ticks: state.ticks + 1
-  };
+  });
 }
 
 export function getTickDelay(score) {
@@ -171,6 +212,31 @@ function containsCell(cells, target) {
   return cells.some((cell) => sameCell(cell, target));
 }
 
+function hasCollision(turns) {
+  const collisionBodies = turns.flatMap(({ player, grows }) => (grows ? player.snake : player.snake.slice(0, -1)));
+
+  if (turns.some(({ nextHead }) => isOutsideGrid(nextHead) || containsCell(collisionBodies, nextHead))) {
+    return true;
+  }
+
+  for (let index = 0; index < turns.length; index += 1) {
+    for (let otherIndex = index + 1; otherIndex < turns.length; otherIndex += 1) {
+      if (sameCell(turns[index].nextHead, turns[otherIndex].nextHead)) {
+        return true;
+      }
+
+      if (
+        sameCell(turns[index].nextHead, turns[otherIndex].player.snake[0]) &&
+        sameCell(turns[otherIndex].nextHead, turns[index].player.snake[0])
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 function sameCell(first, second) {
   return first.x === second.x && first.y === second.y;
 }
@@ -189,4 +255,79 @@ function cellKey(cell) {
 
 function copyCell(cell) {
   return { x: cell.x, y: cell.y };
+}
+
+function createInitialPlayers({ mode, players, snake, direction }) {
+  if (players) {
+    return players.map((player, index) =>
+      createPlayer({
+        id: player.id ?? (index === 0 ? PLAYER_IDS.ONE : PLAYER_IDS.TWO),
+        label: player.label ?? `Joueur ${index + 1}`,
+        snake: player.snake ?? (index === 0 ? DEFAULT_PLAYER_ONE_SNAKE : DEFAULT_PLAYER_TWO_SNAKE),
+        direction: player.direction ?? (index === 0 ? DIRECTIONS.RIGHT : DIRECTIONS.LEFT),
+        directionQueue: player.directionQueue,
+        score: player.score
+      })
+    );
+  }
+
+  const playerOne = createPlayer({
+    id: PLAYER_IDS.ONE,
+    label: "Joueur 1",
+    snake,
+    direction
+  });
+
+  if (mode !== GAME_MODES.LOCAL_MULTIPLAYER) {
+    return [playerOne];
+  }
+
+  return [
+    playerOne,
+    createPlayer({
+      id: PLAYER_IDS.TWO,
+      label: "Joueur 2",
+      snake: DEFAULT_PLAYER_TWO_SNAKE,
+      direction: DIRECTIONS.LEFT
+    })
+  ];
+}
+
+function createPlayer({ id, label, snake, direction = DIRECTIONS.RIGHT, directionQueue = [], score = 0 }) {
+  return {
+    id,
+    label,
+    snake: snake.map(copyCell),
+    direction,
+    directionQueue: directionQueue.map(copyDirection),
+    score
+  };
+}
+
+function replacePlayerAt(players, index, nextPlayer) {
+  return players.map((player, playerIndex) => (playerIndex === index ? nextPlayer : player));
+}
+
+function getOccupiedCells(players) {
+  return players.flatMap((player) => player.snake.map(copyCell));
+}
+
+function getTotalScore(players) {
+  return players.reduce((total, player) => total + player.score, 0);
+}
+
+function withPlayerAliases(state) {
+  const [primaryPlayer] = state.players;
+
+  return {
+    ...state,
+    snake: primaryPlayer.snake,
+    direction: primaryPlayer.direction,
+    directionQueue: primaryPlayer.directionQueue,
+    score: getTotalScore(state.players)
+  };
+}
+
+function copyDirection(direction) {
+  return direction;
 }

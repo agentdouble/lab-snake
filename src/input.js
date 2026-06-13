@@ -1,36 +1,36 @@
-import { DIRECTIONS } from "./constants.js";
+import { DIRECTIONS, PLAYER_IDS } from "./constants.js";
 
-const KEY_DIRECTIONS = new Map([
-  ["ArrowUp", DIRECTIONS.UP],
-  ["w", DIRECTIONS.UP],
-  ["W", DIRECTIONS.UP],
-  ["z", DIRECTIONS.UP],
-  ["Z", DIRECTIONS.UP],
-  ["ArrowDown", DIRECTIONS.DOWN],
-  ["s", DIRECTIONS.DOWN],
-  ["S", DIRECTIONS.DOWN],
-  ["ArrowLeft", DIRECTIONS.LEFT],
-  ["a", DIRECTIONS.LEFT],
-  ["A", DIRECTIONS.LEFT],
-  ["q", DIRECTIONS.LEFT],
-  ["Q", DIRECTIONS.LEFT],
-  ["ArrowRight", DIRECTIONS.RIGHT],
-  ["d", DIRECTIONS.RIGHT],
-  ["D", DIRECTIONS.RIGHT]
+const KEY_BINDINGS = new Map([
+  ["ArrowUp", { playerId: PLAYER_IDS.ONE, direction: DIRECTIONS.UP }],
+  ["ArrowDown", { playerId: PLAYER_IDS.ONE, direction: DIRECTIONS.DOWN }],
+  ["ArrowLeft", { playerId: PLAYER_IDS.ONE, direction: DIRECTIONS.LEFT }],
+  ["ArrowRight", { playerId: PLAYER_IDS.ONE, direction: DIRECTIONS.RIGHT }],
+  ["w", { playerId: PLAYER_IDS.TWO, direction: DIRECTIONS.UP }],
+  ["W", { playerId: PLAYER_IDS.TWO, direction: DIRECTIONS.UP }],
+  ["z", { playerId: PLAYER_IDS.TWO, direction: DIRECTIONS.UP }],
+  ["Z", { playerId: PLAYER_IDS.TWO, direction: DIRECTIONS.UP }],
+  ["s", { playerId: PLAYER_IDS.TWO, direction: DIRECTIONS.DOWN }],
+  ["S", { playerId: PLAYER_IDS.TWO, direction: DIRECTIONS.DOWN }],
+  ["a", { playerId: PLAYER_IDS.TWO, direction: DIRECTIONS.LEFT }],
+  ["A", { playerId: PLAYER_IDS.TWO, direction: DIRECTIONS.LEFT }],
+  ["q", { playerId: PLAYER_IDS.TWO, direction: DIRECTIONS.LEFT }],
+  ["Q", { playerId: PLAYER_IDS.TWO, direction: DIRECTIONS.LEFT }],
+  ["d", { playerId: PLAYER_IDS.TWO, direction: DIRECTIONS.RIGHT }],
+  ["D", { playerId: PLAYER_IDS.TWO, direction: DIRECTIONS.RIGHT }]
 ]);
 
 const SWIPE_THRESHOLD_PX = 24;
 
 export function bindKeyboard(onDirection) {
   window.addEventListener("keydown", (event) => {
-    const direction = KEY_DIRECTIONS.get(event.key);
+    const binding = KEY_BINDINGS.get(event.key);
 
-    if (!direction) {
+    if (!binding) {
       return;
     }
 
     event.preventDefault();
-    onDirection(direction);
+    onDirection(binding.direction, binding.playerId);
   });
 }
 
@@ -59,10 +59,10 @@ export function bindTouch(target, onDirection) {
     }
 
     if (Math.abs(deltaX) > Math.abs(deltaY)) {
-      onDirection(deltaX > 0 ? DIRECTIONS.RIGHT : DIRECTIONS.LEFT);
+      onDirection(deltaX > 0 ? DIRECTIONS.RIGHT : DIRECTIONS.LEFT, PLAYER_IDS.ONE);
       return;
     }
 
-    onDirection(deltaY > 0 ? DIRECTIONS.DOWN : DIRECTIONS.UP);
+    onDirection(deltaY > 0 ? DIRECTIONS.DOWN : DIRECTIONS.UP, PLAYER_IDS.ONE);
   });
 }
