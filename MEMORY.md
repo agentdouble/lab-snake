@@ -4,3 +4,4 @@
 - La logique de jeu testable vit dans `src/engine.js`; le rendu canvas, les entrees clavier/tactile, le stockage local et le bootstrap sont separes dans `renderer.js`, `input.js`, `storage.js` et `main.js`.
 - Les tests utilisent le runner Node integre via `npm test`, avec les scenarios de base dans `tests/engine.test.js`.
 - Le depot GitHub cible est `https://github.com/agentdouble/lab-snake`; la branche de publication est `main`.
+- Le serpent est rendu avec une palette arc-en-ciel dans `src/renderer.js`; la pomme est dessinee apres le serpent pour rester visible au-dessus des segments si une cellule se chevauche.
