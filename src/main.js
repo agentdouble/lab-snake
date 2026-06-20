@@ -1,10 +1,11 @@
-import { DIRECTIONS, START_DELAY_MS, STATUS } from "./constants.js";
+import { START_DELAY_MS, STATUS } from "./constants.js";
 import {
   createInitialState,
   getTickDelay,
   pauseGame,
   queueDirection,
   resetGame,
+  restoreState,
   resumeGame,
   startGame,
   stepState
@@ -24,7 +25,15 @@ import {
   normalizeSettings
 } from "./settings.js";
 import { DEFAULT_SNAKE_COLOR_ID, SNAKE_COLOR_OPTIONS } from "./snake-colors.js";
-import { loadBestScore, loadSettings, saveBestScore, saveSettings } from "./storage.js";
+import {
+  clearSavedGame,
+  loadBestScore,
+  loadSavedGame,
+  loadSettings,
+  saveBestScore,
+  saveGameState,
+  saveSettings
+} from "./storage.js";
 
 const canvas = document.querySelector("#game-canvas");
 const scoreValue = document.querySelector("#score-value");
@@ -50,8 +59,13 @@ const keepColorToggle = document.querySelector("#keep-color-toggle");
 const settingsResetButton = document.querySelector("#settings-reset-button");
 const render = createRenderer(canvas);
 
-let settings = loadSettings();
-let state = createInitialState({ bestScore: loadBestScore(), mapId: settings.map });
+const bestScore = loadBestScore();
+const savedGame = loadSavedGame();
+
+let settings = savedGame?.settings ?? loadSettings();
+let state = savedGame
+  ? restoreState(savedGame.state, { bestScore, mapId: settings.map })
+  : createInitialState({ bestScore, mapId: settings.map });
 let loopTimer = null;
 let resumeAfterSettings = false;
 
@@ -62,6 +76,7 @@ function setState(nextState, options = {}) {
     saveBestScore(state.bestScore);
   }
 
+  syncSavedGame(options);
   render(state, settings);
   updateHud();
 }
@@ -135,7 +150,7 @@ function restart() {
     setSettings({ ...settings, snakeColor: DEFAULT_SNAKE_COLOR_ID }, { reschedule: false });
   }
 
-  setState(resetGame(state, { mapId: settings.map }));
+  setState(resetGame(state, { mapId: settings.map }), { clearSavedGame: true });
   canvas.focus();
 }
 
@@ -248,12 +263,13 @@ function setSettings(nextSettings, options = {}) {
   if (mapChanged) {
     resumeAfterSettings = false;
     clearTick();
-    setState(resetGame(state, { mapId: settings.map }));
+    setState(resetGame(state, { mapId: settings.map }), { clearSavedGame: true });
     return;
   }
 
   render(state, settings);
   updateHud();
+  syncSavedGame();
 
   if (reschedule && state.status === STATUS.RUNNING && !isSettingsOpen()) {
     clearTick();
@@ -365,6 +381,17 @@ function statusText(status) {
   }
 }
 
+function syncSavedGame(options = {}) {
+  if (options.clearSavedGame || state.status === STATUS.GAME_OVER || state.status === STATUS.WON) {
+    clearSavedGame();
+    return;
+  }
+
+  if (state.status === STATUS.RUNNING || state.status === STATUS.PAUSED) {
+    saveGameState(state, settings);
+  }
+}
+
 playButton.addEventListener("click", play);
 pauseButton.addEventListener("click", togglePause);
 restartButton.addEventListener("click", restart);
@@ -419,4 +446,5 @@ window.addEventListener("blur", () => {
 
 window.addEventListener("resize", () => render(state, settings));
 
-setState(queueDirection(state, DIRECTIONS.RIGHT));
+setState(state);
+scheduleTick();

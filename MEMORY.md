@@ -10,3 +10,4 @@
 - Le menu `Reglages` expose les vitesses `Lente`, `Normale`, `Rapide` et `Expert`, les themes de plateau, la bascule de grille, les maps et la couleur du serpent; ces choix sont sauvegardes par `storage.js` dans `snake.settings`.
 - Les types de map Snake sont definis dans `src/maps.js`; le choix de map est un champ de `src/settings.js`, persiste dans `snake.settings`, et une nouvelle partie applique la map selectionnee.
 - Le choix de couleur du serpent est centralise dans `src/snake-colors.js` et stocke dans `settings.snakeColor`; `settings.keepSnakeColorOnRestart` rend explicite si `Rejouer` garde la couleur ou revient au vert par defaut.
+- La reprise de partie utilise `localStorage` avec la cle `snake.currentGame`; le snapshot inclut l'etat moteur et les reglages actifs, tandis que `snake.bestScore` et `snake.settings` restent separes.

@@ -36,6 +36,23 @@ export function createInitialState(options = {}) {
   };
 }
 
+export function restoreState(snapshot, options = {}) {
+  const map = getMapDefinition(snapshot.map ?? options.mapId);
+  const bestScore = Math.max(options.bestScore ?? 0, snapshot.bestScore ?? 0, snapshot.score);
+
+  return {
+    map,
+    snake: snapshot.snake.map(copyCell),
+    direction: directionFromName(snapshot.direction),
+    directionQueue: snapshot.directionQueue.map(directionFromName),
+    apple: snapshot.apple ? copyCell(snapshot.apple) : null,
+    score: snapshot.score,
+    bestScore,
+    status: snapshot.status,
+    ticks: snapshot.ticks
+  };
+}
+
 export function startGame(state) {
   if (state.status === STATUS.RUNNING || state.status === STATUS.GAME_OVER || state.status === STATUS.WON) {
     return state;
@@ -219,4 +236,14 @@ function isOpposite(first, second) {
 
 function cellKey(cell) {
   return `${cell.x}:${cell.y}`;
+}
+
+function directionFromName(name) {
+  const direction = Object.values(DIRECTIONS).find((candidate) => candidate.name === name);
+
+  if (!direction) {
+    throw new Error(`Unknown direction: ${name}`);
+  }
+
+  return direction;
 }
