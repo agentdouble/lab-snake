@@ -5,7 +5,7 @@ import { STATUS } from "../src/constants.js";
 import { getMapDefinition } from "../src/maps.js";
 import { createRenderer } from "../src/renderer.js";
 
-test("the renderer applies the selected color theme to snake segments", () => {
+test("the renderer applies the selected snake color to snake segments", () => {
   const { canvas, fills } = createCanvasSpy();
   const render = createRenderer(canvas);
   const map = getMapDefinition("classic");
@@ -21,14 +21,14 @@ test("the renderer applies the selected color theme to snake segments", () => {
       apple: null,
       status: STATUS.RUNNING
     },
-    { color: "mint" }
+    { color: "mint", snakeColor: "cyan" }
   );
 
   const snakeFills = fills.filter((fill) => fill.shape === "roundRect");
 
   assert.deepEqual(
     snakeFills.map((fill) => fill.color),
-    ["#f2ff9f", "#177767", "#5ee6a8", "#5ee6a8"]
+    ["#4cc9f0", "#176b84", "#4cc9f0", "#4cc9f0"]
   );
 });
 

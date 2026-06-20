@@ -70,13 +70,23 @@
           </label>
 
           <label class="settings-field" for="color-setting">
-            <span>Couleur</span>
+            <span>Theme</span>
             <select id="color-setting" name="color"></select>
           </label>
 
           <label class="settings-field" for="map-setting">
             <span>Map nouvelle partie</span>
             <select id="map-setting" name="map"></select>
+          </label>
+
+          <fieldset class="settings-field snake-color-field">
+            <legend>Couleur du serpent</legend>
+            <div class="color-options" id="snake-color-options"></div>
+          </fieldset>
+
+          <label class="color-persistence">
+            <input type="checkbox" id="keep-color-toggle">
+            <span>Garder pour Rejouer</span>
           </label>
 
           <menu class="settings-actions">
