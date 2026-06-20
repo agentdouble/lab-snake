@@ -93,11 +93,42 @@ test("resuming keeps the snake position, direction, score, and speed state", () 
   assert.deepEqual(resumedState.direction, runningState.direction);
   assert.equal(resumedState.score, runningState.score);
   assert.equal(getTickDelay(resumedState.score), getTickDelay(runningState.score));
+  assert.equal(getTickDelay(resumedState.score, 1.5), getTickDelay(runningState.score, 1.5));
   assert.equal(resumedState.ticks, runningState.ticks);
+});
+
+test("self collision ends the game", () => {
+  const state = startGame(
+    createInitialState({
+      snake: [
+        { x: 5, y: 5 },
+        { x: 5, y: 6 },
+        { x: 4, y: 6 },
+        { x: 4, y: 5 },
+        { x: 4, y: 4 }
+      ],
+      apple: { x: 0, y: 0 },
+      direction: DIRECTIONS.DOWN
+    })
+  );
+
+  const nextState = stepState(state);
+
+  assert.equal(nextState.status, STATUS.GAME_OVER);
+  assert.equal(nextState.ticks, 1);
+  assert.deepEqual(nextState.snake, state.snake);
 });
 
 test("the game accelerates without passing the minimum delay", () => {
   assert.equal(getTickDelay(0), 145);
   assert.equal(getTickDelay(10), 95);
   assert.equal(getTickDelay(1000), 62);
+});
+
+test("the game speed multiplier changes tick delay without dropping below the minimum", () => {
+  assert.equal(getTickDelay(0, 1.25), 116);
+  assert.equal(getTickDelay(0, 1.5), 97);
+  assert.equal(getTickDelay(10, 0.8), 119);
+  assert.equal(getTickDelay(1000, 1.5), 62);
+  assert.equal(getTickDelay(0, 0), 145);
 });

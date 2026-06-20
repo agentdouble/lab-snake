@@ -133,8 +133,11 @@ export function stepState(state, randomizer = Math.random) {
   };
 }
 
-export function getTickDelay(score) {
-  return Math.max(MIN_DELAY_MS, START_DELAY_MS - score * DELAY_STEP_MS);
+export function getTickDelay(score, speedMultiplier = 1) {
+  const normalizedMultiplier = Number.isFinite(speedMultiplier) && speedMultiplier > 0 ? speedMultiplier : 1;
+  const scaledDelay = Math.round((START_DELAY_MS - score * DELAY_STEP_MS) / normalizedMultiplier);
+
+  return Math.max(MIN_DELAY_MS, scaledDelay);
 }
 
 export function randomFreeCell(occupiedCells, randomizer = Math.random) {

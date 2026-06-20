@@ -53,6 +53,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
@@ -61,6 +62,14 @@ h1 {
   font-size: clamp(2rem, 8vw, 4rem);
   line-height: 0.9;
   letter-spacing: 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .status-pill {
@@ -72,6 +81,38 @@ h1 {
   color: var(--yellow);
   text-align: center;
   font-weight: 800;
+}
+
+.settings-button,
+.settings-close {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  color: var(--ink);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.settings-button {
+  padding: 8px 12px;
+}
+
+.settings-close {
+  padding: 8px 11px;
+}
+
+.settings-button:hover,
+.settings-close:hover {
+  border-color: var(--cyan);
+}
+
+.settings-button:focus-visible,
+.settings-close:focus-visible,
+.settings-field select:focus-visible,
+.control-button:focus-visible {
+  outline: 3px solid rgba(76, 201, 240, 0.35);
+  outline-offset: 2px;
 }
 
 .score-strip {
@@ -164,9 +205,91 @@ h1 {
   cursor: not-allowed;
 }
 
+.settings-dialog {
+  width: min(92vw, 430px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 24px 70px var(--shadow);
+}
+
+.settings-dialog:not([open]) {
+  display: none;
+}
+
+.settings-dialog[open] {
+  display: block;
+}
+
+.settings-dialog::backdrop {
+  background: rgba(7, 8, 10, 0.68);
+}
+
+.settings-panel {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 18px;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-header h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+
+.settings-field {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.settings-field span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.settings-field select {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: var(--panel-strong);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 800;
+}
+
+.settings-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 2px 0 0;
+  padding: 0;
+}
+
 @media (max-width: 480px) {
   .game-shell {
     gap: 10px;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .score-strip {
@@ -179,6 +302,14 @@ h1 {
   }
 
   .control-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-dialog {
+    width: calc(100vw - 24px);
+  }
+
+  .settings-actions {
     grid-template-columns: 1fr;
   }
 }
