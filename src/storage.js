@@ -1,12 +1,16 @@
 import { DELAY_STEP_MS, DIRECTIONS, MIN_DELAY_MS, START_DELAY_MS, STATUS } from "./constants.js";
 import { getMapDefinition } from "./maps.js";
-import { normalizeSettings } from "./settings.js";
+import { getEffectiveSpeedOption, normalizeSettings } from "./settings.js";
 
-const BEST_SCORE_KEY = "snake.bestScore";
 const CHALLENGE_BEST_SCORE_PREFIX = "snake.challengeBestScore.";
 const SETTINGS_KEY = "snake.settings";
-const SAVED_GAME_KEY = "snake.currentGame";
 const SAVED_GAME_VERSION = 2;
+
+export const STORAGE_KEYS = Object.freeze({
+  legacyBestScore: "snake.bestScore",
+  bestScoreSegments: "snake.bestScores.v2",
+  savedGame: "snake.currentGame"
+});
 
 const RESTORABLE_STATUSES = new Set([STATUS.READY, STATUS.RUNNING, STATUS.PAUSED]);
 const ENGINE_SETTINGS = Object.freeze({
@@ -15,12 +19,66 @@ const ENGINE_SETTINGS = Object.freeze({
   delayStepMs: DELAY_STEP_MS
 });
 
-export function loadBestScore() {
-  return loadStoredScore(BEST_SCORE_KEY);
+// The legacy value was global, so v2 ignores it instead of guessing a context.
+export function loadBestScore(settings = {}) {
+  const bestScores = loadBestScores();
+
+  return bestScores[scoreContextKey(settings)] ?? 0;
 }
 
-export function saveBestScore(bestScore) {
-  saveStoredScore(BEST_SCORE_KEY, bestScore);
+export function saveBestScore(settings, bestScore) {
+  const storage = getLocalStorage();
+
+  if (!storage) {
+    return 0;
+  }
+
+  const bestScores = loadBestScores();
+  const key = scoreContextKey(settings);
+  const previousBestScore = bestScores[key] ?? 0;
+  const nextBestScore = Math.max(previousBestScore, sanitizeScore(bestScore));
+
+  bestScores[key] = nextBestScore;
+  storage.setItem(STORAGE_KEYS.bestScoreSegments, JSON.stringify(bestScores));
+
+  return nextBestScore;
+}
+
+export function loadBestScores() {
+  const storage = getLocalStorage();
+
+  if (!storage) {
+    return {};
+  }
+
+  const value = storage.getItem(STORAGE_KEYS.bestScoreSegments);
+
+  if (!value) {
+    return {};
+  }
+
+  try {
+    const parsedValue = JSON.parse(value);
+
+    if (!parsedValue || typeof parsedValue !== "object" || Array.isArray(parsedValue)) {
+      return {};
+    }
+
+    return Object.fromEntries(
+      Object.entries(parsedValue)
+        .map(([key, score]) => [key, sanitizeScore(score)])
+        .filter(([, score]) => score > 0)
+    );
+  } catch {
+    return {};
+  }
+}
+
+export function scoreContextKey(settings = {}) {
+  const normalizedSettings = normalizeSettings(settings);
+  const effectiveSpeed = getEffectiveSpeedOption(normalizedSettings);
+
+  return `map=${normalizedSettings.map}|mode=${normalizedSettings.mode}|speed=${effectiveSpeed.id}`;
 }
 
 export function loadChallengeBestScore(seed) {
@@ -28,11 +86,17 @@ export function loadChallengeBestScore(seed) {
 }
 
 export function saveChallengeBestScore(seed, bestScore) {
-  saveStoredScore(challengeBestScoreKey(seed), bestScore);
+  return saveStoredScore(challengeBestScoreKey(seed), bestScore);
 }
 
 export function loadSettings() {
-  const value = window.localStorage.getItem(SETTINGS_KEY);
+  const storage = getLocalStorage();
+
+  if (!storage) {
+    return normalizeSettings();
+  }
+
+  const value = storage.getItem(SETTINGS_KEY);
 
   if (!value) {
     return normalizeSettings();
@@ -46,11 +110,23 @@ export function loadSettings() {
 }
 
 export function saveSettings(settings) {
-  window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(normalizeSettings(settings)));
+  const storage = getLocalStorage();
+
+  if (!storage) {
+    return;
+  }
+
+  storage.setItem(SETTINGS_KEY, JSON.stringify(normalizeSettings(settings)));
 }
 
 export function loadSavedGame() {
-  const value = window.localStorage.getItem(SAVED_GAME_KEY);
+  const storage = getLocalStorage();
+
+  if (!storage) {
+    return null;
+  }
+
+  const value = storage.getItem(STORAGE_KEYS.savedGame);
 
   if (!value) {
     return null;
@@ -71,11 +147,23 @@ export function loadSavedGame() {
 }
 
 export function saveGameState(state, settings) {
-  window.localStorage.setItem(SAVED_GAME_KEY, JSON.stringify(serializeGameState(state, settings)));
+  const storage = getLocalStorage();
+
+  if (!storage) {
+    return;
+  }
+
+  storage.setItem(STORAGE_KEYS.savedGame, JSON.stringify(serializeGameState(state, settings)));
 }
 
 export function clearSavedGame() {
-  window.localStorage.removeItem(SAVED_GAME_KEY);
+  const storage = getLocalStorage();
+
+  if (!storage) {
+    return;
+  }
+
+  storage.removeItem(STORAGE_KEYS.savedGame);
 }
 
 export function serializeGameState(state, settings) {
@@ -146,6 +234,43 @@ export function normalizeSavedGame(value) {
       ticks: snapshot.ticks
     }
   };
+}
+
+function loadStoredScore(key) {
+  const storage = getLocalStorage();
+
+  if (!storage) {
+    return 0;
+  }
+
+  return sanitizeScore(storage.getItem(key));
+}
+
+function saveStoredScore(key, bestScore) {
+  const storage = getLocalStorage();
+
+  if (!storage) {
+    return 0;
+  }
+
+  const nextBestScore = Math.max(loadStoredScore(key), sanitizeScore(bestScore));
+  storage.setItem(key, String(nextBestScore));
+
+  return nextBestScore;
+}
+
+function challengeBestScoreKey(seed) {
+  return `${CHALLENGE_BEST_SCORE_PREFIX}${encodeURIComponent(seed)}`;
+}
+
+function sanitizeScore(value) {
+  const parsedValue = Number.parseInt(value ?? "0", 10);
+
+  return Number.isFinite(parsedValue) ? Math.max(0, parsedValue) : 0;
+}
+
+function getLocalStorage() {
+  return globalThis.window?.localStorage ?? globalThis.localStorage ?? null;
 }
 
 function sameEngineSettings(settings) {
@@ -265,19 +390,4 @@ function cellKey(cell) {
 
 function copyCell(cell) {
   return { x: cell.x, y: cell.y };
-}
-
-function loadStoredScore(key) {
-  const value = window.localStorage.getItem(key);
-  const parsedValue = Number.parseInt(value ?? "0", 10);
-
-  return Number.isFinite(parsedValue) ? parsedValue : 0;
-}
-
-function saveStoredScore(key, bestScore) {
-  window.localStorage.setItem(key, String(bestScore));
-}
-
-function challengeBestScoreKey(seed) {
-  return `${CHALLENGE_BEST_SCORE_PREFIX}${encodeURIComponent(seed)}`;
 }

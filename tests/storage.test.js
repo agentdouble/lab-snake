@@ -8,7 +8,9 @@ import {
   normalizeSavedGame,
   saveBestScore,
   saveGameState,
-  serializeGameState
+  scoreContextKey,
+  serializeGameState,
+  STORAGE_KEYS
 } from "../src/storage.js";
 
 const ACTIVE_SETTINGS = Object.freeze({
@@ -19,6 +21,54 @@ const ACTIVE_SETTINGS = Object.freeze({
   map: "wide",
   snakeColor: "violet",
   keepSnakeColorOnRestart: false
+});
+
+test("legacy global best score is ignored for segmented scores", (t) => {
+  const localStorage = useMemoryStorage(t);
+  localStorage.setItem(STORAGE_KEYS.legacyBestScore, "12");
+
+  assert.equal(loadBestScore({ map: "classic", mode: "standard", speed: "normal" }), 0);
+});
+
+test("best scores are saved separately for map mode and effective speed context", (t) => {
+  const localStorage = useMemoryStorage(t);
+  const normalContext = { map: "classic", mode: "standard", speed: "normal" };
+  const fastContext = { map: "classic", mode: "standard", speed: "fast" };
+  const canyonQuickContext = { map: "canyon", mode: "quick", speed: "slow" };
+
+  saveBestScore(normalContext, 4);
+  saveBestScore(fastContext, 8);
+  saveBestScore(canyonQuickContext, 3);
+  saveBestScore(normalContext, 2);
+
+  assert.equal(loadBestScore(normalContext), 4);
+  assert.equal(loadBestScore(fastContext), 8);
+  assert.equal(loadBestScore(canyonQuickContext), 3);
+
+  const storedScores = JSON.parse(localStorage.getItem(STORAGE_KEYS.bestScoreSegments));
+  assert.deepEqual(storedScores, {
+    [scoreContextKey(normalContext)]: 4,
+    [scoreContextKey(fastContext)]: 8,
+    [scoreContextKey(canyonQuickContext)]: 3
+  });
+});
+
+test("quick mode stores scores under its locked fast speed", (t) => {
+  useMemoryStorage(t);
+  const quickSlowContext = { map: "classic", mode: "quick", speed: "slow" };
+  const quickFastContext = { map: "classic", mode: "quick", speed: "fast" };
+
+  saveBestScore(quickSlowContext, 5);
+
+  assert.equal(scoreContextKey(quickSlowContext), scoreContextKey(quickFastContext));
+  assert.equal(loadBestScore(quickFastContext), 5);
+});
+
+test("invalid segmented score data is ignored cleanly", (t) => {
+  const localStorage = useMemoryStorage(t);
+  localStorage.setItem(STORAGE_KEYS.bestScoreSegments, "{bad-json");
+
+  assert.equal(loadBestScore({ map: "classic", mode: "standard", speed: "normal" }), 0);
 });
 
 test("game snapshots include the playable state and active settings", () => {
@@ -49,26 +99,18 @@ test("game snapshots include the playable state and active settings", () => {
 });
 
 test("obsolete or invalid saved games are ignored without clearing best score", (t) => {
-  const localStorage = createMemoryStorage();
-  global.window = { localStorage };
-  t.after(() => {
-    delete global.window;
-  });
+  const localStorage = useMemoryStorage(t);
 
-  saveBestScore(12);
-  localStorage.setItem("snake.currentGame", JSON.stringify({ version: 1 }));
+  saveBestScore(ACTIVE_SETTINGS, 12);
+  localStorage.setItem(STORAGE_KEYS.savedGame, JSON.stringify({ version: 1 }));
 
   assert.equal(loadSavedGame(), null);
-  assert.equal(loadBestScore(), 12);
-  assert.equal(localStorage.getItem("snake.currentGame"), null);
+  assert.equal(loadBestScore(ACTIVE_SETTINGS), 12);
+  assert.equal(localStorage.getItem(STORAGE_KEYS.savedGame), null);
 });
 
 test("valid saved games round-trip through localStorage", (t) => {
-  const localStorage = createMemoryStorage();
-  global.window = { localStorage };
-  t.after(() => {
-    delete global.window;
-  });
+  useMemoryStorage(t);
 
   saveGameState(createWideState({ status: STATUS.PAUSED }), ACTIVE_SETTINGS);
 
@@ -152,6 +194,16 @@ function createWideState(options = {}) {
     status: options.status ?? STATUS.RUNNING,
     ticks: 4
   };
+}
+
+function useMemoryStorage(t) {
+  const localStorage = createMemoryStorage();
+  globalThis.window = { localStorage };
+  t.after(() => {
+    delete globalThis.window;
+  });
+
+  return localStorage;
 }
 
 function createMemoryStorage() {

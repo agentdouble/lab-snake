@@ -34,7 +34,8 @@ import {
   saveBestScore,
   saveChallengeBestScore,
   saveGameState,
-  saveSettings
+  saveSettings,
+  scoreContextKey
 } from "./storage.js";
 
 const PLAY_CONTEXTS = Object.freeze({
@@ -100,7 +101,9 @@ function runTick() {
     return;
   }
 
-  setState(stepState(state), { persistBestScore: true });
+  const nextState = stepState(state);
+
+  setState(nextState, { persistBestScore: isTerminalStatus(nextState.status) });
 
   if (state.status === STATUS.RUNNING) {
     scheduleTick();
@@ -228,7 +231,7 @@ function restoreGameState(snapshot, context) {
 }
 
 function currentBestScore(context) {
-  return context.mode === PLAY_CONTEXTS.CHALLENGE ? loadChallengeBestScore(context.seed) : loadBestScore();
+  return context.mode === PLAY_CONTEXTS.CHALLENGE ? loadChallengeBestScore(context.seed) : loadBestScore(settings);
 }
 
 function createRestoredRandomizer(context, snapshot) {
@@ -252,7 +255,7 @@ function saveCurrentBestScore() {
     return;
   }
 
-  saveBestScore(state.bestScore);
+  saveBestScore(settings, state.bestScore);
 }
 
 function readPlayContextFromUrl() {
@@ -415,14 +418,15 @@ function updateColorControls() {
 
 function setSettings(nextSettings, options = {}) {
   const { reschedule = true } = options;
+  const currentScoreContextKey = scoreContextKey(settings);
   const nextNormalizedSettings = normalizeSettings(nextSettings);
-  const mapChanged = nextNormalizedSettings.map !== state.map.id;
+  const scoreContextChanged = scoreContextKey(nextNormalizedSettings) !== currentScoreContextKey;
 
   settings = nextNormalizedSettings;
   savePersistableSettings();
   syncSettingsControls();
 
-  if (mapChanged) {
+  if (scoreContextChanged) {
     resumeAfterSettings = false;
     clearTick();
     setState(createGameState(playContext), { clearSavedGame: true });
@@ -525,6 +529,10 @@ function handleSettingsClosed() {
   }
 
   settingsButton.focus();
+}
+
+function isTerminalStatus(status) {
+  return status === STATUS.GAME_OVER || status === STATUS.WON;
 }
 
 function statusText(status) {
