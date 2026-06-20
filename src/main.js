@@ -5,6 +5,7 @@ import {
   pauseGame,
   queueDirection,
   resetGame,
+  resumeGame,
   startGame,
   stepState
 } from "./engine.js";
@@ -68,14 +69,34 @@ function clearTick() {
 }
 
 function play() {
+  if (state.status !== STATUS.READY) {
+    return;
+  }
+
   setState(startGame(state));
   scheduleTick();
   canvas.focus();
 }
 
-function pause() {
-  setState(pauseGame(state));
-  clearTick();
+function togglePause(options = {}) {
+  const { focusCanvas = true } = options;
+
+  if (state.status === STATUS.RUNNING) {
+    clearTick();
+    setState(pauseGame(state));
+    if (focusCanvas) {
+      canvas.focus();
+    }
+    return;
+  }
+
+  if (state.status === STATUS.PAUSED) {
+    setState(resumeGame(state));
+    scheduleTick();
+    if (focusCanvas) {
+      canvas.focus();
+    }
+  }
 }
 
 function restart() {
@@ -85,7 +106,7 @@ function restart() {
 }
 
 function handleDirection(direction) {
-  if (state.status === STATUS.READY || state.status === STATUS.PAUSED) {
+  if (state.status === STATUS.READY) {
     state = startGame(state);
   }
 
@@ -98,8 +119,10 @@ function updateHud() {
   bestValue.textContent = String(state.bestScore);
   speedValue.textContent = `${(START_DELAY_MS / getTickDelay(state.score)).toFixed(1)}x`;
   statusLabel.textContent = statusText(state.status);
-  playButton.disabled = state.status === STATUS.RUNNING || state.status === STATUS.GAME_OVER || state.status === STATUS.WON;
-  pauseButton.disabled = state.status !== STATUS.RUNNING;
+  playButton.disabled = state.status !== STATUS.READY;
+  pauseButton.disabled = state.status !== STATUS.RUNNING && state.status !== STATUS.PAUSED;
+  pauseButton.textContent = state.status === STATUS.PAUSED ? "Reprendre" : "Pause";
+  pauseButton.setAttribute("aria-pressed", String(state.status === STATUS.PAUSED));
 }
 
 function statusText(status) {
@@ -119,7 +142,7 @@ function statusText(status) {
 }
 
 playButton.addEventListener("click", play);
-pauseButton.addEventListener("click", pause);
+pauseButton.addEventListener("click", togglePause);
 restartButton.addEventListener("click", restart);
 
 bindKeyboard(handleDirection);
@@ -127,7 +150,7 @@ bindTouch(canvas, handleDirection);
 
 window.addEventListener("blur", () => {
   if (state.status === STATUS.RUNNING) {
-    pause();
+    togglePause({ focusCanvas: false });
   }
 });
 
