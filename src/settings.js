@@ -18,6 +18,11 @@ export const SPEED_OPTIONS = Object.freeze([
     id: "fast",
     label: "Rapide",
     multiplier: 1.25
+  }),
+  Object.freeze({
+    id: "expert",
+    label: "Expert",
+    multiplier: 1.5
   })
 ]);
 

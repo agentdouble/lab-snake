@@ -63,7 +63,8 @@ test("the game accelerates without passing the minimum delay", () => {
 
 test("the game speed multiplier changes tick delay without dropping below the minimum", () => {
   assert.equal(getTickDelay(0, 1.25), 116);
+  assert.equal(getTickDelay(0, 1.5), 97);
   assert.equal(getTickDelay(10, 0.8), 119);
-  assert.equal(getTickDelay(1000, 1.25), 62);
+  assert.equal(getTickDelay(1000, 1.5), 62);
   assert.equal(getTickDelay(0, 0), 145);
 });

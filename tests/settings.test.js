@@ -12,7 +12,7 @@ import {
 test("settings options expose clear labels for speed and color controls", () => {
   assert.deepEqual(
     SPEED_OPTIONS.map((option) => option.label),
-    ["Lente", "Normale", "Rapide"]
+    ["Lente", "Normale", "Rapide", "Expert"]
   );
   assert.deepEqual(
     COLOR_THEMES.map((theme) => theme.label),
@@ -26,5 +26,6 @@ test("settings normalization falls back to the default choices", () => {
     color: "classic"
   });
   assert.equal(getSpeedOption("fast").multiplier, 1.25);
+  assert.equal(getSpeedOption("expert").multiplier, 1.5);
   assert.equal(getColorTheme("mint").colors.snakeBody, "#5ee6a8");
 });
