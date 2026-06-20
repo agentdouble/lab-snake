@@ -1,7 +1,13 @@
+import { DEFAULT_MAP_ID, MAPS, getMapDefinition } from "./maps.js";
+import { DEFAULT_SNAKE_COLOR_ID, normalizeSnakeColorId } from "./snake-colors.js";
+
 export const DEFAULT_GAME_SETTINGS = Object.freeze({
   speed: "normal",
   color: "classic",
-  showGrid: true
+  showGrid: true,
+  map: DEFAULT_MAP_ID,
+  snakeColor: DEFAULT_SNAKE_COLOR_ID,
+  keepSnakeColorOnRestart: true
 });
 
 export const SPEED_OPTIONS = Object.freeze([
@@ -34,9 +40,6 @@ export const COLOR_THEMES = Object.freeze([
     colors: Object.freeze({
       board: "#111714",
       grid: "rgba(214, 236, 218, 0.08)",
-      snakeHead: "#d8f75c",
-      snakeBody: "#4fd06b",
-      snakeShadow: "#19724d",
       apple: "#ef476f",
       appleCore: "#ffd166",
       overlay: "rgba(11, 13, 12, 0.58)",
@@ -49,9 +52,6 @@ export const COLOR_THEMES = Object.freeze([
     colors: Object.freeze({
       board: "#0d1b1e",
       grid: "rgba(170, 226, 214, 0.1)",
-      snakeHead: "#f2ff9f",
-      snakeBody: "#5ee6a8",
-      snakeShadow: "#177767",
       apple: "#ff6b6b",
       appleCore: "#ffe66d",
       overlay: "rgba(7, 18, 21, 0.62)",
@@ -64,9 +64,6 @@ export const COLOR_THEMES = Object.freeze([
     colors: Object.freeze({
       board: "#171423",
       grid: "rgba(255, 255, 255, 0.08)",
-      snakeHead: "#f9f871",
-      snakeBody: "#00d4ff",
-      snakeShadow: "#5b4dff",
       apple: "#ff4fa3",
       appleCore: "#ffffff",
       overlay: "rgba(13, 10, 28, 0.62)",
@@ -75,13 +72,26 @@ export const COLOR_THEMES = Object.freeze([
   })
 ]);
 
+export const MAP_OPTIONS = Object.freeze(
+  MAPS.map((map) =>
+    Object.freeze({
+      id: map.id,
+      label: map.label,
+      summary: map.summary
+    })
+  )
+);
+
 export function normalizeSettings(settings = {}) {
   const candidate = settings && typeof settings === "object" ? settings : {};
 
   return {
     speed: getSpeedOption(candidate.speed).id,
     color: getColorTheme(candidate.color).id,
-    showGrid: typeof candidate.showGrid === "boolean" ? candidate.showGrid : DEFAULT_GAME_SETTINGS.showGrid
+    showGrid: typeof candidate.showGrid === "boolean" ? candidate.showGrid : DEFAULT_GAME_SETTINGS.showGrid,
+    map: getMapOption(candidate.map).id,
+    snakeColor: normalizeSnakeColorId(candidate.snakeColor),
+    keepSnakeColorOnRestart: candidate.keepSnakeColorOnRestart !== false
   };
 }
 
@@ -91,4 +101,10 @@ export function getSpeedOption(speedId) {
 
 export function getColorTheme(colorId) {
   return COLOR_THEMES.find((theme) => theme.id === colorId) ?? COLOR_THEMES[0];
+}
+
+export function getMapOption(mapId) {
+  const map = getMapDefinition(mapId);
+
+  return MAP_OPTIONS.find((option) => option.id === map.id) ?? MAP_OPTIONS[0];
 }

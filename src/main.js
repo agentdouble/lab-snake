@@ -5,6 +5,7 @@ import {
   pauseGame,
   queueDirection,
   resetGame,
+  resumeGame,
   startGame,
   stepState
 } from "./engine.js";
@@ -13,16 +14,20 @@ import { createRenderer } from "./renderer.js";
 import {
   COLOR_THEMES,
   DEFAULT_GAME_SETTINGS,
+  MAP_OPTIONS,
   SPEED_OPTIONS,
+  getMapOption,
   getSpeedOption,
   normalizeSettings
 } from "./settings.js";
+import { DEFAULT_SNAKE_COLOR_ID, SNAKE_COLOR_OPTIONS } from "./snake-colors.js";
 import { loadBestScore, loadSettings, saveBestScore, saveSettings } from "./storage.js";
 
 const canvas = document.querySelector("#game-canvas");
 const scoreValue = document.querySelector("#score-value");
 const bestValue = document.querySelector("#best-value");
 const speedValue = document.querySelector("#speed-value");
+const mapValue = document.querySelector("#map-value");
 const statusLabel = document.querySelector("#status-label");
 const playButton = document.querySelector("#play-button");
 const pauseButton = document.querySelector("#pause-button");
@@ -33,11 +38,14 @@ const settingsForm = document.querySelector("#settings-form");
 const speedSetting = document.querySelector("#speed-setting");
 const colorSetting = document.querySelector("#color-setting");
 const gridSetting = document.querySelector("#grid-setting");
+const mapSetting = document.querySelector("#map-setting");
+const snakeColorOptions = document.querySelector("#snake-color-options");
+const keepColorToggle = document.querySelector("#keep-color-toggle");
 const settingsResetButton = document.querySelector("#settings-reset-button");
 const render = createRenderer(canvas);
 
-let state = createInitialState({ bestScore: loadBestScore() });
 let settings = loadSettings();
+let state = createInitialState({ bestScore: loadBestScore(), mapId: settings.map });
 let loopTimer = null;
 let resumeAfterSettings = false;
 
@@ -84,19 +92,44 @@ function clearTick() {
 }
 
 function play() {
+  if (state.status !== STATUS.READY) {
+    return;
+  }
+
   setState(startGame(state));
   scheduleTick();
   canvas.focus();
 }
 
-function pause() {
-  setState(pauseGame(state));
-  clearTick();
+function togglePause(options = {}) {
+  const { focusCanvas = true } = options;
+
+  if (state.status === STATUS.RUNNING) {
+    clearTick();
+    setState(pauseGame(state));
+    if (focusCanvas) {
+      canvas.focus();
+    }
+    return;
+  }
+
+  if (state.status === STATUS.PAUSED) {
+    setState(resumeGame(state));
+    scheduleTick();
+    if (focusCanvas) {
+      canvas.focus();
+    }
+  }
 }
 
 function restart() {
   clearTick();
-  setState(resetGame(state));
+
+  if (!settings.keepSnakeColorOnRestart) {
+    setSettings({ ...settings, snakeColor: DEFAULT_SNAKE_COLOR_ID }, { reschedule: false });
+  }
+
+  setState(resetGame(state, { mapId: settings.map }));
   canvas.focus();
 }
 
@@ -105,7 +138,7 @@ function handleDirection(direction) {
     return;
   }
 
-  if (state.status === STATUS.READY || state.status === STATUS.PAUSED) {
+  if (state.status === STATUS.READY) {
     state = startGame(state);
   }
 
@@ -115,22 +148,32 @@ function handleDirection(direction) {
 
 function updateHud() {
   const speedOption = currentSpeedOption();
+  const mapOption = currentMapOption();
 
   scoreValue.textContent = String(state.score);
   bestValue.textContent = String(state.bestScore);
   speedValue.textContent = `${speedOption.label} ${(START_DELAY_MS / getTickDelay(state.score, speedOption.multiplier)).toFixed(1)}x`;
+  mapValue.textContent = mapOption.label;
   statusLabel.textContent = isSettingsOpen() ? "Reglages" : statusText(state.status);
-  playButton.disabled = state.status === STATUS.RUNNING || state.status === STATUS.GAME_OVER || state.status === STATUS.WON;
-  pauseButton.disabled = state.status !== STATUS.RUNNING;
+  playButton.disabled = state.status !== STATUS.READY;
+  pauseButton.disabled = state.status !== STATUS.RUNNING && state.status !== STATUS.PAUSED;
+  pauseButton.textContent = state.status === STATUS.PAUSED ? "Reprendre" : "Pause";
+  pauseButton.setAttribute("aria-pressed", String(state.status === STATUS.PAUSED));
 }
 
 function currentSpeedOption() {
   return getSpeedOption(settings.speed);
 }
 
+function currentMapOption() {
+  return getMapOption(settings.map);
+}
+
 function populateSettingsControls() {
   speedSetting.replaceChildren(...SPEED_OPTIONS.map(createOptionElement));
   colorSetting.replaceChildren(...COLOR_THEMES.map(createOptionElement));
+  mapSetting.replaceChildren(...MAP_OPTIONS.map(createMapOptionElement));
+  snakeColorOptions.replaceChildren(...SNAKE_COLOR_OPTIONS.map(createColorButton));
   syncSettingsControls();
 }
 
@@ -143,30 +186,96 @@ function createOptionElement(option) {
   return element;
 }
 
+function createMapOptionElement(option) {
+  const element = createOptionElement(option);
+
+  element.textContent = `${option.label} - ${option.summary}`;
+
+  return element;
+}
+
+function createColorButton(option) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "color-choice";
+  button.dataset.colorId = option.id;
+  button.style.setProperty("--snake-color", option.fill);
+  button.style.setProperty("--snake-accent", option.accent);
+  button.textContent = option.label;
+  button.setAttribute("aria-pressed", "false");
+
+  return button;
+}
+
 function syncSettingsControls() {
   speedSetting.value = settings.speed;
   colorSetting.value = settings.color;
   gridSetting.checked = settings.showGrid;
+  mapSetting.value = settings.map;
+  keepColorToggle.checked = settings.keepSnakeColorOnRestart;
+  updateColorControls();
 }
 
-function setSettings(nextSettings) {
-  settings = normalizeSettings(nextSettings);
-  saveSettings(settings);
+function updateColorControls() {
+  for (const button of snakeColorOptions.querySelectorAll("[data-color-id]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.colorId === settings.snakeColor));
+  }
+}
+
+function setSettings(nextSettings, options = {}) {
+  const { reschedule = true } = options;
+  const nextNormalizedSettings = normalizeSettings(nextSettings);
+  const mapChanged = nextNormalizedSettings.map !== state.map.id;
+
+  settings = nextNormalizedSettings;
+  savePersistableSettings();
   syncSettingsControls();
+
+  if (mapChanged) {
+    resumeAfterSettings = false;
+    clearTick();
+    setState(resetGame(state, { mapId: settings.map }));
+    return;
+  }
+
   render(state, settings);
   updateHud();
 
-  if (state.status === STATUS.RUNNING && !isSettingsOpen()) {
+  if (reschedule && state.status === STATUS.RUNNING && !isSettingsOpen()) {
     clearTick();
     scheduleTick();
   }
 }
 
+function savePersistableSettings() {
+  const settingsToSave = settings.keepSnakeColorOnRestart
+    ? settings
+    : { ...settings, snakeColor: DEFAULT_SNAKE_COLOR_ID };
+
+  saveSettings(settingsToSave);
+}
+
 function handleSettingsChange() {
   setSettings({
+    ...settings,
     speed: speedSetting.value,
     color: colorSetting.value,
-    showGrid: gridSetting.checked
+    showGrid: gridSetting.checked,
+    map: mapSetting.value
+  });
+}
+
+function setSnakeColor(colorId) {
+  setSettings({
+    ...settings,
+    snakeColor: colorId
+  });
+}
+
+function setKeepColorOnRestart(keepColor) {
+  setSettings({
+    ...settings,
+    keepSnakeColorOnRestart: keepColor
   });
 }
 
@@ -242,7 +351,7 @@ function statusText(status) {
 }
 
 playButton.addEventListener("click", play);
-pauseButton.addEventListener("click", pause);
+pauseButton.addEventListener("click", togglePause);
 restartButton.addEventListener("click", restart);
 settingsButton.addEventListener("click", openSettings);
 settingsForm.addEventListener("submit", (event) => {
@@ -254,6 +363,23 @@ settingsForm.addEventListener("submit", (event) => {
 speedSetting.addEventListener("change", handleSettingsChange);
 colorSetting.addEventListener("change", handleSettingsChange);
 gridSetting.addEventListener("change", handleSettingsChange);
+mapSetting.addEventListener("change", handleSettingsChange);
+snakeColorOptions.addEventListener("click", (event) => {
+  if (!(event.target instanceof Element)) {
+    return;
+  }
+
+  const colorButton = event.target.closest("[data-color-id]");
+
+  if (!colorButton) {
+    return;
+  }
+
+  setSnakeColor(colorButton.dataset.colorId);
+});
+keepColorToggle.addEventListener("change", () => {
+  setKeepColorOnRestart(keepColorToggle.checked);
+});
 settingsResetButton.addEventListener("click", () => setSettings(DEFAULT_GAME_SETTINGS));
 settingsDialog.addEventListener("close", handleSettingsClosed);
 settingsDialog.addEventListener("click", (event) => {
@@ -271,7 +397,7 @@ bindTouch(canvas, handleDirection);
 
 window.addEventListener("blur", () => {
   if (state.status === STATUS.RUNNING) {
-    pause();
+    togglePause({ focusCanvas: false });
   }
 });
 
