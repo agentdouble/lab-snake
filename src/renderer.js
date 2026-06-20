@@ -1,4 +1,5 @@
 import { CANVAS_SIZE, GRID_SIZE, STATUS } from "./constants.js";
+import { getMapConfig } from "./contexts.js";
 
 const COLORS = Object.freeze({
   board: "#111714",
@@ -6,6 +7,8 @@ const COLORS = Object.freeze({
   snakeHead: "#d8f75c",
   snakeBody: "#4fd06b",
   snakeShadow: "#19724d",
+  obstacle: "#60715f",
+  obstacleEdge: "#8ca08b",
   apple: "#ef476f",
   appleCore: "#ffd166",
   overlay: "rgba(11, 13, 12, 0.58)",
@@ -18,6 +21,7 @@ export function createRenderer(canvas) {
   return function render(state) {
     context.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
     drawBoard(context);
+    drawObstacles(context, state.context);
     drawApple(context, state.apple);
     drawSnake(context, state.snake);
     drawStatus(context, state.status);
@@ -45,6 +49,15 @@ function drawBoard(context) {
     context.lineTo(CANVAS_SIZE, position);
     context.stroke();
   }
+}
+
+function drawObstacles(context, gameContext) {
+  const mapConfig = getMapConfig(gameContext?.mapId);
+
+  mapConfig.obstacles.forEach((cell) => {
+    drawRoundedCell(context, cell, COLORS.obstacle, 5);
+    drawRoundedCell(context, cell, COLORS.obstacleEdge, 10);
+  });
 }
 
 function drawSnake(context, snake) {

@@ -55,8 +55,42 @@ test("wall collision ends the game", () => {
   assert.equal(nextState.bestScore, 0);
 });
 
+test("wrap mode crosses board edges instead of ending the game", () => {
+  const state = startGame(
+    createInitialState({
+      context: { modeId: "wrap" },
+      snake: [{ x: 19, y: 10 }],
+      apple: { x: 0, y: 10 },
+      direction: DIRECTIONS.RIGHT
+    })
+  );
+
+  const nextState = stepState(state, () => 0);
+
+  assert.equal(nextState.status, STATUS.RUNNING);
+  assert.deepEqual(nextState.snake[0], { x: 0, y: 10 });
+  assert.equal(nextState.score, 1);
+});
+
+test("map obstacles end the game when hit", () => {
+  const state = startGame(
+    createInitialState({
+      context: { mapId: "islands" },
+      snake: [{ x: 4, y: 5 }],
+      apple: { x: 0, y: 0 },
+      direction: DIRECTIONS.RIGHT
+    })
+  );
+
+  const nextState = stepState(state);
+
+  assert.equal(nextState.status, STATUS.GAME_OVER);
+});
+
 test("the game accelerates without passing the minimum delay", () => {
   assert.equal(getTickDelay(0), 145);
   assert.equal(getTickDelay(10), 95);
   assert.equal(getTickDelay(1000), 62);
+  assert.equal(getTickDelay(0, "fast"), 100);
+  assert.equal(getTickDelay(1000, "fast"), 48);
 });

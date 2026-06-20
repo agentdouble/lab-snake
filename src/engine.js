@@ -1,11 +1,10 @@
 import {
-  DELAY_STEP_MS,
   DIRECTIONS,
+  DEFAULT_GAME_CONTEXT,
   GRID_SIZE,
-  MIN_DELAY_MS,
-  START_DELAY_MS,
   STATUS
 } from "./constants.js";
+import { createGameContext, getMapConfig, getModeConfig, getSpeedConfig } from "./contexts.js";
 
 const DEFAULT_SNAKE = Object.freeze([
   Object.freeze({ x: 9, y: 10 }),
@@ -19,18 +18,22 @@ export function createInitialState(options = {}) {
     randomizer = Math.random,
     snake = DEFAULT_SNAKE,
     direction = DIRECTIONS.RIGHT,
-    apple
+    apple,
+    context = DEFAULT_GAME_CONTEXT
   } = options;
 
+  const gameContext = createGameContext(context);
+  const mapConfig = getMapConfig(gameContext.mapId);
   const initialSnake = snake.map(copyCell);
 
   return {
     snake: initialSnake,
     direction,
     directionQueue: [],
-    apple: apple ? copyCell(apple) : randomFreeCell(initialSnake, randomizer),
+    apple: apple ? copyCell(apple) : randomFreeCell(initialSnake, randomizer, mapConfig.obstacles),
     score: 0,
     bestScore,
+    context: gameContext,
     status: STATUS.READY,
     ticks: 0
   };
@@ -54,8 +57,9 @@ export function pauseGame(state) {
 
 export function resetGame(state, options = {}) {
   return createInitialState({
-    bestScore: state.bestScore,
-    ...options
+    ...options,
+    bestScore: options.bestScore ?? state.bestScore,
+    context: options.context ?? state.context
   });
 }
 
@@ -86,12 +90,20 @@ export function stepState(state, randomizer = Math.random) {
   }
 
   const [queuedDirection, ...remainingQueue] = state.directionQueue;
+  const context = createGameContext(state.context);
+  const mapConfig = getMapConfig(context.mapId);
+  const modeConfig = getModeConfig(context.modeId);
   const direction = queuedDirection ?? state.direction;
-  const nextHead = addCells(state.snake[0], direction);
+  const rawNextHead = addCells(state.snake[0], direction);
+  const nextHead = modeConfig.wrap ? wrapCell(rawNextHead) : rawNextHead;
   const grows = state.apple && sameCell(nextHead, state.apple);
   const collisionBody = grows ? state.snake : state.snake.slice(0, -1);
 
-  if (isOutsideGrid(nextHead) || containsCell(collisionBody, nextHead)) {
+  if (
+    (!modeConfig.wrap && isOutsideGrid(rawNextHead)) ||
+    containsCell(collisionBody, nextHead) ||
+    containsCell(mapConfig.obstacles, nextHead)
+  ) {
     return {
       ...state,
       direction,
@@ -108,7 +120,7 @@ export function stepState(state, randomizer = Math.random) {
     nextSnake.pop();
   }
 
-  const nextApple = grows ? randomFreeCell(nextSnake, randomizer) : state.apple;
+  const nextApple = grows ? randomFreeCell(nextSnake, randomizer, mapConfig.obstacles) : state.apple;
   const nextScore = grows ? state.score + 1 : state.score;
   const hasWon = grows && !nextApple;
 
@@ -119,18 +131,21 @@ export function stepState(state, randomizer = Math.random) {
     directionQueue: remainingQueue,
     apple: nextApple,
     score: nextScore,
+    context,
     bestScore: Math.max(state.bestScore, nextScore),
     status: hasWon ? STATUS.WON : STATUS.RUNNING,
     ticks: state.ticks + 1
   };
 }
 
-export function getTickDelay(score) {
-  return Math.max(MIN_DELAY_MS, START_DELAY_MS - score * DELAY_STEP_MS);
+export function getTickDelay(score, speedId = DEFAULT_GAME_CONTEXT.speedId) {
+  const speedConfig = getSpeedConfig(speedId);
+
+  return Math.max(speedConfig.minDelayMs, speedConfig.startDelayMs - score * speedConfig.delayStepMs);
 }
 
-export function randomFreeCell(occupiedCells, randomizer = Math.random) {
-  const occupied = new Set(occupiedCells.map(cellKey));
+export function randomFreeCell(occupiedCells, randomizer = Math.random, blockedCells = []) {
+  const occupied = new Set([...occupiedCells, ...blockedCells].map(cellKey));
   const freeCellsCount = GRID_SIZE * GRID_SIZE - occupied.size;
 
   if (freeCellsCount <= 0) {
@@ -160,6 +175,13 @@ function addCells(cell, direction) {
   return {
     x: cell.x + direction.x,
     y: cell.y + direction.y
+  };
+}
+
+function wrapCell(cell) {
+  return {
+    x: (cell.x + GRID_SIZE) % GRID_SIZE,
+    y: (cell.y + GRID_SIZE) % GRID_SIZE
   };
 }
 

@@ -1,4 +1,5 @@
-import { DIRECTIONS, START_DELAY_MS, STATUS } from "./constants.js";
+import { DIRECTIONS, GAME_MAPS, GAME_MODES, SPEED_PRESETS, START_DELAY_MS, STATUS } from "./constants.js";
+import { createGameContext, sameGameContext } from "./contexts.js";
 import {
   createInitialState,
   getTickDelay,
@@ -17,19 +18,30 @@ const scoreValue = document.querySelector("#score-value");
 const bestValue = document.querySelector("#best-value");
 const speedValue = document.querySelector("#speed-value");
 const statusLabel = document.querySelector("#status-label");
+const mapSelect = document.querySelector("#map-select");
+const modeSelect = document.querySelector("#mode-select");
+const speedSelect = document.querySelector("#speed-select");
 const playButton = document.querySelector("#play-button");
 const pauseButton = document.querySelector("#pause-button");
 const restartButton = document.querySelector("#restart-button");
 const render = createRenderer(canvas);
 
-let state = createInitialState({ bestScore: loadBestScore() });
+populateSelect(mapSelect, GAME_MAPS);
+populateSelect(modeSelect, GAME_MODES);
+populateSelect(speedSelect, SPEED_PRESETS);
+
+let activeContext = getSelectedContext();
+let state = createInitialState({
+  context: activeContext,
+  bestScore: loadBestScore(activeContext)
+});
 let loopTimer = null;
 
 function setState(nextState, options = {}) {
   state = nextState;
 
   if (options.persistBestScore) {
-    saveBestScore(state.bestScore);
+    saveBestScore(state.context, state.bestScore);
   }
 
   render(state);
@@ -43,7 +55,9 @@ function runTick() {
     return;
   }
 
-  setState(stepState(state), { persistBestScore: true });
+  const nextState = stepState(state);
+
+  setState(nextState, { persistBestScore: isTerminalStatus(nextState.status) });
 
   if (state.status === STATUS.RUNNING) {
     scheduleTick();
@@ -96,10 +110,48 @@ function handleDirection(direction) {
 function updateHud() {
   scoreValue.textContent = String(state.score);
   bestValue.textContent = String(state.bestScore);
-  speedValue.textContent = `${(START_DELAY_MS / getTickDelay(state.score)).toFixed(1)}x`;
+  speedValue.textContent = `${(START_DELAY_MS / getTickDelay(state.score, state.context.speedId)).toFixed(1)}x`;
   statusLabel.textContent = statusText(state.status);
   playButton.disabled = state.status === STATUS.RUNNING || state.status === STATUS.GAME_OVER || state.status === STATUS.WON;
   pauseButton.disabled = state.status !== STATUS.RUNNING;
+}
+
+function handleContextChange() {
+  const nextContext = getSelectedContext();
+
+  if (sameGameContext(activeContext, nextContext)) {
+    return;
+  }
+
+  activeContext = nextContext;
+  clearTick();
+  setState(
+    resetGame(state, {
+      context: activeContext,
+      bestScore: loadBestScore(activeContext)
+    })
+  );
+}
+
+function getSelectedContext() {
+  return createGameContext({
+    mapId: mapSelect.value,
+    modeId: modeSelect.value,
+    speedId: speedSelect.value
+  });
+}
+
+function populateSelect(select, options) {
+  options.forEach((option) => {
+    const element = document.createElement("option");
+    element.value = option.id;
+    element.textContent = option.label;
+    select.append(element);
+  });
+}
+
+function isTerminalStatus(status) {
+  return status === STATUS.GAME_OVER || status === STATUS.WON;
 }
 
 function statusText(status) {
@@ -121,6 +173,9 @@ function statusText(status) {
 playButton.addEventListener("click", play);
 pauseButton.addEventListener("click", pause);
 restartButton.addEventListener("click", restart);
+mapSelect.addEventListener("change", handleContextChange);
+modeSelect.addEventListener("change", handleContextChange);
+speedSelect.addEventListener("change", handleContextChange);
 
 bindKeyboard(handleDirection);
 bindTouch(canvas, handleDirection);
