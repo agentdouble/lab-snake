@@ -36,6 +36,10 @@
           <strong id="speed-value">1.0x</strong>
         </div>
         <div class="stat-block">
+          <span class="stat-label">Mode</span>
+          <strong id="mode-value">Standard</strong>
+        </div>
+        <div class="stat-block">
           <span class="stat-label">Map</span>
           <strong id="map-value">Classique</strong>
         </div>
@@ -64,8 +68,13 @@
             <button class="settings-close" type="submit">Fermer</button>
           </div>
 
+          <label class="settings-field" for="mode-setting">
+            <span>Mode</span>
+            <select id="mode-setting" name="mode"></select>
+          </label>
+
           <label class="settings-field" for="speed-setting">
-            <span>Vitesse</span>
+            <span id="speed-setting-label">Vitesse</span>
             <select id="speed-setting" name="speed"></select>
           </label>
 

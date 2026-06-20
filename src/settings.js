@@ -2,12 +2,28 @@ import { DEFAULT_MAP_ID, MAPS, getMapDefinition } from "./maps.js";
 import { DEFAULT_SNAKE_COLOR_ID, normalizeSnakeColorId } from "./snake-colors.js";
 
 export const DEFAULT_GAME_SETTINGS = Object.freeze({
+  mode: "standard",
   speed: "normal",
   color: "classic",
   map: DEFAULT_MAP_ID,
   snakeColor: DEFAULT_SNAKE_COLOR_ID,
   keepSnakeColorOnRestart: true
 });
+
+export const QUICK_MODE_SPEED_ID = "fast";
+
+export const GAME_MODES = Object.freeze([
+  Object.freeze({
+    id: "standard",
+    label: "Standard",
+    speed: null
+  }),
+  Object.freeze({
+    id: "quick",
+    label: "Mode rapide",
+    speed: QUICK_MODE_SPEED_ID
+  })
+]);
 
 export const SPEED_OPTIONS = Object.freeze([
   Object.freeze({
@@ -82,13 +98,31 @@ export const MAP_OPTIONS = Object.freeze(
 );
 
 export function normalizeSettings(settings = {}) {
+  const mode = getGameMode(settings.mode);
+
   return {
+    mode: mode.id,
     speed: getSpeedOption(settings.speed).id,
     color: getColorTheme(settings.color).id,
     map: getMapOption(settings.map).id,
     snakeColor: normalizeSnakeColorId(settings.snakeColor),
     keepSnakeColorOnRestart: settings.keepSnakeColorOnRestart !== false
   };
+}
+
+export function getGameMode(modeId) {
+  return GAME_MODES.find((mode) => mode.id === modeId) ?? GAME_MODES[0];
+}
+
+export function isSpeedLockedByMode(modeId) {
+  return Boolean(getGameMode(modeId).speed);
+}
+
+export function getEffectiveSpeedOption(settings = {}) {
+  const normalizedSettings = normalizeSettings(settings);
+  const mode = getGameMode(normalizedSettings.mode);
+
+  return getSpeedOption(mode.speed ?? normalizedSettings.speed);
 }
 
 export function getSpeedOption(speedId) {

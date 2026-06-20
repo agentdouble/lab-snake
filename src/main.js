@@ -14,10 +14,13 @@ import { createRenderer } from "./renderer.js";
 import {
   COLOR_THEMES,
   DEFAULT_GAME_SETTINGS,
+  GAME_MODES,
   MAP_OPTIONS,
   SPEED_OPTIONS,
+  getEffectiveSpeedOption,
+  getGameMode,
   getMapOption,
-  getSpeedOption,
+  isSpeedLockedByMode,
   normalizeSettings
 } from "./settings.js";
 import { DEFAULT_SNAKE_COLOR_ID, SNAKE_COLOR_OPTIONS } from "./snake-colors.js";
@@ -27,6 +30,7 @@ const canvas = document.querySelector("#game-canvas");
 const scoreValue = document.querySelector("#score-value");
 const bestValue = document.querySelector("#best-value");
 const speedValue = document.querySelector("#speed-value");
+const modeValue = document.querySelector("#mode-value");
 const mapValue = document.querySelector("#map-value");
 const statusLabel = document.querySelector("#status-label");
 const playButton = document.querySelector("#play-button");
@@ -35,7 +39,9 @@ const restartButton = document.querySelector("#restart-button");
 const settingsButton = document.querySelector("#settings-button");
 const settingsDialog = document.querySelector("#settings-dialog");
 const settingsForm = document.querySelector("#settings-form");
+const modeSetting = document.querySelector("#mode-setting");
 const speedSetting = document.querySelector("#speed-setting");
+const speedSettingLabel = document.querySelector("#speed-setting-label");
 const colorSetting = document.querySelector("#color-setting");
 const mapSetting = document.querySelector("#map-setting");
 const snakeColorOptions = document.querySelector("#snake-color-options");
@@ -147,10 +153,12 @@ function handleDirection(direction) {
 
 function updateHud() {
   const speedOption = currentSpeedOption();
+  const mode = getGameMode(settings.mode);
   const mapOption = currentMapOption();
 
   scoreValue.textContent = String(state.score);
   bestValue.textContent = String(state.bestScore);
+  modeValue.textContent = mode.label;
   speedValue.textContent = `${speedOption.label} ${(START_DELAY_MS / getTickDelay(state.score, speedOption.multiplier)).toFixed(1)}x`;
   mapValue.textContent = mapOption.label;
   statusLabel.textContent = isSettingsOpen() ? "Reglages" : statusText(state.status);
@@ -161,7 +169,7 @@ function updateHud() {
 }
 
 function currentSpeedOption() {
-  return getSpeedOption(settings.speed);
+  return getEffectiveSpeedOption(settings);
 }
 
 function currentMapOption() {
@@ -169,6 +177,7 @@ function currentMapOption() {
 }
 
 function populateSettingsControls() {
+  modeSetting.replaceChildren(...GAME_MODES.map(createOptionElement));
   speedSetting.replaceChildren(...SPEED_OPTIONS.map(createOptionElement));
   colorSetting.replaceChildren(...COLOR_THEMES.map(createOptionElement));
   mapSetting.replaceChildren(...MAP_OPTIONS.map(createMapOptionElement));
@@ -207,7 +216,12 @@ function createColorButton(option) {
 }
 
 function syncSettingsControls() {
-  speedSetting.value = settings.speed;
+  const speedLocked = isSpeedLockedByMode(settings.mode);
+
+  modeSetting.value = settings.mode;
+  speedSetting.value = currentSpeedOption().id;
+  speedSetting.disabled = speedLocked;
+  speedSettingLabel.textContent = speedLocked ? "Vitesse du mode" : "Vitesse";
   colorSetting.value = settings.color;
   mapSetting.value = settings.map;
   keepColorToggle.checked = settings.keepSnakeColorOnRestart;
@@ -245,21 +259,22 @@ function setSettings(nextSettings, options = {}) {
   }
 }
 
+function handleSettingsChange(event) {
+  setSettings({
+    ...settings,
+    mode: modeSetting.value,
+    speed: event.target === speedSetting ? speedSetting.value : settings.speed,
+    color: colorSetting.value,
+    map: mapSetting.value
+  });
+}
+
 function savePersistableSettings() {
   const settingsToSave = settings.keepSnakeColorOnRestart
     ? settings
     : { ...settings, snakeColor: DEFAULT_SNAKE_COLOR_ID };
 
   saveSettings(settingsToSave);
-}
-
-function handleSettingsChange() {
-  setSettings({
-    ...settings,
-    speed: speedSetting.value,
-    color: colorSetting.value,
-    map: mapSetting.value
-  });
 }
 
 function setSnakeColor(colorId) {
@@ -286,7 +301,7 @@ function openSettings() {
   syncSettingsControls();
   showSettingsDialog();
   updateHud();
-  speedSetting.focus();
+  modeSetting.focus();
 }
 
 function showSettingsDialog() {
@@ -355,6 +370,7 @@ settingsForm.addEventListener("submit", (event) => {
     closeSettingsDialog();
   }
 });
+modeSetting.addEventListener("change", handleSettingsChange);
 speedSetting.addEventListener("change", handleSettingsChange);
 colorSetting.addEventListener("change", handleSettingsChange);
 mapSetting.addEventListener("change", handleSettingsChange);
