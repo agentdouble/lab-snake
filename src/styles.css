@@ -109,6 +109,7 @@ h1 {
 
 .settings-button:focus-visible,
 .settings-close:focus-visible,
+.color-choice:focus-visible,
 .settings-field select:focus-visible,
 .control-button:focus-visible {
   outline: 3px solid rgba(76, 201, 240, 0.35);
@@ -147,6 +148,89 @@ h1 {
   overflow-wrap: anywhere;
   font-size: clamp(1.35rem, 5vw, 2.1rem);
   line-height: 1;
+}
+
+.snake-color-field {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.snake-color-field legend {
+  margin: 0 0 7px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.color-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 6px;
+}
+
+.color-choice {
+  min-width: 0;
+  min-height: 38px;
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  color: var(--ink);
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.color-choice::before {
+  content: "";
+  width: 18px;
+  aspect-ratio: 1;
+  border: 1px solid rgba(244, 247, 239, 0.34);
+  border-radius: 999px;
+  background: var(--snake-color);
+  box-shadow: inset 0 -4px 0 var(--snake-accent);
+}
+
+.color-choice:hover {
+  border-color: var(--cyan);
+}
+
+.color-choice[aria-pressed="true"] {
+  border-color: var(--snake-color);
+  box-shadow: 0 0 0 2px rgba(244, 247, 239, 0.12);
+}
+
+.color-persistence {
+  min-width: 0;
+  min-height: 46px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 0.84rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.color-persistence input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--green);
 }
 
 .board-wrap {
@@ -301,6 +385,11 @@ h1 {
   .score-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .color-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .stat-block {
