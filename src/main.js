@@ -1,9 +1,10 @@
-import { DIRECTIONS, START_DELAY_MS, STATUS } from "./constants.js";
+import { START_DELAY_MS, STATUS } from "./constants.js";
 import {
   createInitialState,
   getTickDelay,
   pauseGame,
   queueDirection,
+  restoreState,
   resumeGame,
   startGame,
   stepState
@@ -25,11 +26,14 @@ import {
 } from "./settings.js";
 import { DEFAULT_SNAKE_COLOR_ID, SNAKE_COLOR_OPTIONS } from "./snake-colors.js";
 import {
+  clearSavedGame,
   loadBestScore,
   loadChallengeBestScore,
+  loadSavedGame,
   loadSettings,
   saveBestScore,
   saveChallengeBestScore,
+  saveGameState,
   saveSettings
 } from "./storage.js";
 
@@ -69,9 +73,11 @@ const keepColorToggle = document.querySelector("#keep-color-toggle");
 const settingsResetButton = document.querySelector("#settings-reset-button");
 const render = createRenderer(canvas);
 
-let settings = loadSettings();
 let playContext = readPlayContextFromUrl();
-let state = createGameState(playContext);
+const savedGame = loadSavedGame();
+
+let settings = savedGame?.settings ?? loadSettings();
+let state = savedGame ? restoreGameState(savedGame.state, playContext) : createGameState(playContext);
 let loopTimer = null;
 let resumeAfterSettings = false;
 
@@ -82,6 +88,7 @@ function setState(nextState, options = {}) {
     saveCurrentBestScore();
   }
 
+  syncSavedGame(options);
   render(state, settings);
   updateHud();
 }
@@ -155,7 +162,7 @@ function restart() {
     setSettings({ ...settings, snakeColor: DEFAULT_SNAKE_COLOR_ID }, { reschedule: false });
   }
 
-  setState(createGameState(playContext));
+  setState(createGameState(playContext), { clearSavedGame: true });
   canvas.focus();
 }
 
@@ -198,16 +205,45 @@ function updateHud() {
 function createGameState(context) {
   if (context.mode !== PLAY_CONTEXTS.CHALLENGE) {
     return createInitialState({
-      bestScore: loadBestScore(),
+      bestScore: currentBestScore(context),
       mapId: settings.map
     });
   }
 
   return createInitialState({
-    bestScore: loadChallengeBestScore(context.seed),
+    bestScore: currentBestScore(context),
     mapId: settings.map,
     randomizer: createSeededRandomizer(context.seed)
   });
+}
+
+function restoreGameState(snapshot, context) {
+  const randomizer = createRestoredRandomizer(context, snapshot);
+
+  return restoreState(snapshot, {
+    bestScore: currentBestScore(context),
+    mapId: settings.map,
+    ...(randomizer ? { randomizer } : {})
+  });
+}
+
+function currentBestScore(context) {
+  return context.mode === PLAY_CONTEXTS.CHALLENGE ? loadChallengeBestScore(context.seed) : loadBestScore();
+}
+
+function createRestoredRandomizer(context, snapshot) {
+  if (context.mode !== PLAY_CONTEXTS.CHALLENGE) {
+    return null;
+  }
+
+  const randomizer = createSeededRandomizer(context.seed);
+  const generatedAppleCount = Number.isInteger(snapshot.score) ? snapshot.score + 1 : 0;
+
+  for (let index = 0; index < generatedAppleCount; index += 1) {
+    randomizer();
+  }
+
+  return randomizer;
 }
 
 function saveCurrentBestScore() {
@@ -256,7 +292,7 @@ function startContext(nextContext) {
   clearTick();
   playContext = nextContext;
   syncChallengeSeedInput();
-  setState(createGameState(playContext));
+  setState(createGameState(playContext), { clearSavedGame: true });
   canvas.focus();
 }
 
@@ -389,12 +425,13 @@ function setSettings(nextSettings, options = {}) {
   if (mapChanged) {
     resumeAfterSettings = false;
     clearTick();
-    setState(createGameState(playContext));
+    setState(createGameState(playContext), { clearSavedGame: true });
     return;
   }
 
   render(state, settings);
   updateHud();
+  syncSavedGame();
 
   if (reschedule && state.status === STATUS.RUNNING && !isSettingsOpen()) {
     clearTick();
@@ -506,6 +543,17 @@ function statusText(status) {
   }
 }
 
+function syncSavedGame(options = {}) {
+  if (options.clearSavedGame || state.status === STATUS.GAME_OVER || state.status === STATUS.WON) {
+    clearSavedGame();
+    return;
+  }
+
+  if (state.status === STATUS.RUNNING || state.status === STATUS.PAUSED) {
+    saveGameState(state, settings);
+  }
+}
+
 playButton.addEventListener("click", play);
 pauseButton.addEventListener("click", togglePause);
 restartButton.addEventListener("click", restart);
@@ -570,4 +618,5 @@ window.addEventListener("blur", () => {
 
 window.addEventListener("resize", () => render(state, settings));
 
-setState(queueDirection(state, DIRECTIONS.RIGHT));
+setState(state);
+scheduleTick();

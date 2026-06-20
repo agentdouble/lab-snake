@@ -11,3 +11,4 @@
 - Les types de map Snake sont definis dans `src/maps.js`; le choix de map est un champ de `src/settings.js`, persiste dans `snake.settings`, et une nouvelle partie applique la map selectionnee.
 - Le choix de couleur du serpent est centralise dans `src/snake-colors.js` et stocke dans `settings.snakeColor`; `settings.keepSnakeColorOnRestart` rend explicite si `Rejouer` garde la couleur ou revient au vert par defaut.
 - Le mode defi quotidien/partageable utilise `src/seed.js` pour generer des seeds deterministes et stocke les meilleurs scores de defi separement via le prefixe localStorage `snake.challengeBestScore.`.
+- La reprise de partie utilise `localStorage` avec la cle `snake.currentGame`; le snapshot inclut l'etat moteur et les reglages actifs, tandis que `snake.bestScore` et `snake.settings` restent separes.
