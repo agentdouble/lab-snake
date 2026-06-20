@@ -55,6 +55,28 @@ test("wall collision ends the game", () => {
   assert.equal(nextState.bestScore, 0);
 });
 
+test("self collision ends the game", () => {
+  const state = startGame(
+    createInitialState({
+      snake: [
+        { x: 5, y: 5 },
+        { x: 5, y: 6 },
+        { x: 4, y: 6 },
+        { x: 4, y: 5 },
+        { x: 4, y: 4 }
+      ],
+      apple: { x: 0, y: 0 },
+      direction: DIRECTIONS.DOWN
+    })
+  );
+
+  const nextState = stepState(state);
+
+  assert.equal(nextState.status, STATUS.GAME_OVER);
+  assert.equal(nextState.ticks, 1);
+  assert.deepEqual(nextState.snake, state.snake);
+});
+
 test("the game accelerates without passing the minimum delay", () => {
   assert.equal(getTickDelay(0), 145);
   assert.equal(getTickDelay(10), 95);
