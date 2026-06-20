@@ -5,7 +5,9 @@ import { DIRECTIONS, STATUS } from "../src/constants.js";
 import {
   createInitialState,
   getTickDelay,
+  pauseGame,
   queueDirection,
+  resumeGame,
   startGame,
   stepState
 } from "../src/engine.js";
@@ -53,6 +55,46 @@ test("wall collision ends the game", () => {
 
   assert.equal(nextState.status, STATUS.GAME_OVER);
   assert.equal(nextState.bestScore, 0);
+});
+
+test("a paused game does not advance snake, apples, score, or collisions", () => {
+  const runningState = startGame(
+    createInitialState({
+      apple: { x: 10, y: 10 }
+    })
+  );
+  const pausedState = pauseGame(runningState);
+
+  const nextState = stepState(pausedState, () => 0);
+
+  assert.strictEqual(nextState, pausedState);
+  assert.equal(nextState.status, STATUS.PAUSED);
+  assert.equal(nextState.score, 0);
+  assert.equal(nextState.ticks, 0);
+  assert.deepEqual(nextState.snake, runningState.snake);
+  assert.deepEqual(nextState.apple, { x: 10, y: 10 });
+});
+
+test("resuming keeps the snake position, direction, score, and speed state", () => {
+  const runningState = stepState(
+    startGame(
+      createInitialState({
+        apple: { x: 10, y: 10 }
+      })
+    ),
+    () => 0.25
+  );
+  const pausedState = pauseGame(runningState);
+
+  const resumedState = resumeGame(pausedState);
+
+  assert.equal(resumedState.status, STATUS.RUNNING);
+  assert.deepEqual(resumedState.snake, runningState.snake);
+  assert.deepEqual(resumedState.direction, runningState.direction);
+  assert.equal(resumedState.score, runningState.score);
+  assert.equal(getTickDelay(resumedState.score), getTickDelay(runningState.score));
+  assert.equal(getTickDelay(resumedState.score, 1.5), getTickDelay(runningState.score, 1.5));
+  assert.equal(resumedState.ticks, runningState.ticks);
 });
 
 test("self collision ends the game", () => {

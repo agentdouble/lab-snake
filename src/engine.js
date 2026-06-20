@@ -52,6 +52,14 @@ export function pauseGame(state) {
   return { ...state, status: STATUS.PAUSED };
 }
 
+export function resumeGame(state) {
+  if (state.status !== STATUS.PAUSED) {
+    return state;
+  }
+
+  return { ...state, status: STATUS.RUNNING };
+}
+
 export function resetGame(state, options = {}) {
   return createInitialState({
     bestScore: state.bestScore,
