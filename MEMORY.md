@@ -7,4 +7,5 @@
 - Le depot GitHub cible est `https://github.com/agentdouble/lab-snake`; la branche de publication est `main`.
 - La pause Snake est modelee dans `src/engine.js` avec `pauseGame`/`resumeGame`; le bouton UI `pause-button` bascule entre Pause et Reprendre sans reinitialiser l'etat de jeu.
 - Le menu `Reglages` expose les vitesses `Lente`, `Normale`, `Rapide` et `Expert`; ce choix est sauvegarde par `storage.js` et applique au delai moteur via le multiplicateur de `settings.js`.
+- Les types de map Snake sont definis dans `src/maps.js`; le choix de map est un champ de `src/settings.js`, persiste dans `snake.settings`, et une nouvelle partie applique la map selectionnee.
 - Le choix de couleur du serpent est centralise dans `src/snake-colors.js` et stocke dans `settings.snakeColor`; `settings.keepSnakeColorOnRestart` rend explicite si `Rejouer` garde la couleur ou revient au vert par defaut.

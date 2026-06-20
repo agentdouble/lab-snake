@@ -14,7 +14,9 @@ import { createRenderer } from "./renderer.js";
 import {
   COLOR_THEMES,
   DEFAULT_GAME_SETTINGS,
+  MAP_OPTIONS,
   SPEED_OPTIONS,
+  getMapOption,
   getSpeedOption,
   normalizeSettings
 } from "./settings.js";
@@ -25,6 +27,7 @@ const canvas = document.querySelector("#game-canvas");
 const scoreValue = document.querySelector("#score-value");
 const bestValue = document.querySelector("#best-value");
 const speedValue = document.querySelector("#speed-value");
+const mapValue = document.querySelector("#map-value");
 const statusLabel = document.querySelector("#status-label");
 const playButton = document.querySelector("#play-button");
 const pauseButton = document.querySelector("#pause-button");
@@ -34,13 +37,14 @@ const settingsDialog = document.querySelector("#settings-dialog");
 const settingsForm = document.querySelector("#settings-form");
 const speedSetting = document.querySelector("#speed-setting");
 const colorSetting = document.querySelector("#color-setting");
+const mapSetting = document.querySelector("#map-setting");
 const snakeColorOptions = document.querySelector("#snake-color-options");
 const keepColorToggle = document.querySelector("#keep-color-toggle");
 const settingsResetButton = document.querySelector("#settings-reset-button");
 const render = createRenderer(canvas);
 
-let state = createInitialState({ bestScore: loadBestScore() });
 let settings = loadSettings();
+let state = createInitialState({ bestScore: loadBestScore(), mapId: settings.map });
 let loopTimer = null;
 let resumeAfterSettings = false;
 
@@ -124,7 +128,7 @@ function restart() {
     setSettings({ ...settings, snakeColor: DEFAULT_SNAKE_COLOR_ID }, { reschedule: false });
   }
 
-  setState(resetGame(state));
+  setState(resetGame(state, { mapId: settings.map }));
   canvas.focus();
 }
 
@@ -143,10 +147,12 @@ function handleDirection(direction) {
 
 function updateHud() {
   const speedOption = currentSpeedOption();
+  const mapOption = currentMapOption();
 
   scoreValue.textContent = String(state.score);
   bestValue.textContent = String(state.bestScore);
   speedValue.textContent = `${speedOption.label} ${(START_DELAY_MS / getTickDelay(state.score, speedOption.multiplier)).toFixed(1)}x`;
+  mapValue.textContent = mapOption.label;
   statusLabel.textContent = isSettingsOpen() ? "Reglages" : statusText(state.status);
   playButton.disabled = state.status !== STATUS.READY;
   pauseButton.disabled = state.status !== STATUS.RUNNING && state.status !== STATUS.PAUSED;
@@ -158,9 +164,14 @@ function currentSpeedOption() {
   return getSpeedOption(settings.speed);
 }
 
+function currentMapOption() {
+  return getMapOption(settings.map);
+}
+
 function populateSettingsControls() {
   speedSetting.replaceChildren(...SPEED_OPTIONS.map(createOptionElement));
   colorSetting.replaceChildren(...COLOR_THEMES.map(createOptionElement));
+  mapSetting.replaceChildren(...MAP_OPTIONS.map(createMapOptionElement));
   snakeColorOptions.replaceChildren(...SNAKE_COLOR_OPTIONS.map(createColorButton));
   syncSettingsControls();
 }
@@ -170,6 +181,14 @@ function createOptionElement(option) {
 
   element.value = option.id;
   element.textContent = option.label;
+
+  return element;
+}
+
+function createMapOptionElement(option) {
+  const element = createOptionElement(option);
+
+  element.textContent = `${option.label} - ${option.summary}`;
 
   return element;
 }
@@ -190,6 +209,7 @@ function createColorButton(option) {
 function syncSettingsControls() {
   speedSetting.value = settings.speed;
   colorSetting.value = settings.color;
+  mapSetting.value = settings.map;
   keepColorToggle.checked = settings.keepSnakeColorOnRestart;
   updateColorControls();
 }
@@ -202,10 +222,20 @@ function updateColorControls() {
 
 function setSettings(nextSettings, options = {}) {
   const { reschedule = true } = options;
+  const nextNormalizedSettings = normalizeSettings(nextSettings);
+  const mapChanged = nextNormalizedSettings.map !== state.map.id;
 
-  settings = normalizeSettings(nextSettings);
+  settings = nextNormalizedSettings;
   savePersistableSettings();
   syncSettingsControls();
+
+  if (mapChanged) {
+    resumeAfterSettings = false;
+    clearTick();
+    setState(resetGame(state, { mapId: settings.map }));
+    return;
+  }
+
   render(state, settings);
   updateHud();
 
@@ -227,7 +257,8 @@ function handleSettingsChange() {
   setSettings({
     ...settings,
     speed: speedSetting.value,
-    color: colorSetting.value
+    color: colorSetting.value,
+    map: mapSetting.value
   });
 }
 
@@ -326,6 +357,7 @@ settingsForm.addEventListener("submit", (event) => {
 });
 speedSetting.addEventListener("change", handleSettingsChange);
 colorSetting.addEventListener("change", handleSettingsChange);
+mapSetting.addEventListener("change", handleSettingsChange);
 snakeColorOptions.addEventListener("click", (event) => {
   if (!(event.target instanceof Element)) {
     return;

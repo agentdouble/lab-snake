@@ -1,8 +1,10 @@
+import { DEFAULT_MAP_ID, MAPS, getMapDefinition } from "./maps.js";
 import { DEFAULT_SNAKE_COLOR_ID, normalizeSnakeColorId } from "./snake-colors.js";
 
 export const DEFAULT_GAME_SETTINGS = Object.freeze({
   speed: "normal",
   color: "classic",
+  map: DEFAULT_MAP_ID,
   snakeColor: DEFAULT_SNAKE_COLOR_ID,
   keepSnakeColorOnRestart: true
 });
@@ -69,10 +71,21 @@ export const COLOR_THEMES = Object.freeze([
   })
 ]);
 
+export const MAP_OPTIONS = Object.freeze(
+  MAPS.map((map) =>
+    Object.freeze({
+      id: map.id,
+      label: map.label,
+      summary: map.summary
+    })
+  )
+);
+
 export function normalizeSettings(settings = {}) {
   return {
     speed: getSpeedOption(settings.speed).id,
     color: getColorTheme(settings.color).id,
+    map: getMapOption(settings.map).id,
     snakeColor: normalizeSnakeColorId(settings.snakeColor),
     keepSnakeColorOnRestart: settings.keepSnakeColorOnRestart !== false
   };
@@ -84,4 +97,10 @@ export function getSpeedOption(speedId) {
 
 export function getColorTheme(colorId) {
   return COLOR_THEMES.find((theme) => theme.id === colorId) ?? COLOR_THEMES[0];
+}
+
+export function getMapOption(mapId) {
+  const map = getMapDefinition(mapId);
+
+  return MAP_OPTIONS.find((option) => option.id === map.id) ?? MAP_OPTIONS[0];
 }
