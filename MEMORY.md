@@ -2,6 +2,12 @@
 
 - Le projet est un Snake web statique sans dependance runtime. L'entree est `index.html`, le code applicatif est dans `src/`, et `npm start` lance `python3 -m http.server 4173`.
 - La logique de jeu testable vit dans `src/engine.js`; le rendu canvas, les entrees clavier/tactile, le stockage local et le bootstrap sont separes dans `renderer.js`, `input.js`, `storage.js` et `main.js`.
+- Les reglages de jeu disponibles dans l'UI sont centralises dans `src/settings.js`; le moteur accepte un multiplicateur de vitesse optionnel et le renderer applique les themes de plateau via ce module.
 - Les tests utilisent le runner Node integre via `npm test`, avec les scenarios de base dans `tests/engine.test.js`.
 - Le depot GitHub cible est `https://github.com/agentdouble/lab-snake`; la branche de publication est `main`.
-- Les meilleurs scores sont segmentes par contexte `map|mode|speed` dans `snake.bestScores.v2`; l'ancien `snake.bestScore` global est ignore car il ne permet pas de connaitre le contexte de jeu.
+- La pause Snake est modelee dans `src/engine.js` avec `pauseGame`/`resumeGame`; le bouton UI `pause-button` bascule entre Pause et Reprendre sans reinitialiser l'etat de jeu.
+- Le mode rapide est un reglage `mode: "quick"` centralise dans `src/settings.js`; il verrouille la vitesse effective sur `fast` via `getEffectiveSpeedOption`, tandis que le mode standard conserve la vitesse manuelle sauvegardee.
+- Le menu `Reglages` expose les vitesses `Lente`, `Normale`, `Rapide` et `Expert`, les themes de plateau, la bascule de grille, les maps et la couleur du serpent; ces choix sont sauvegardes par `storage.js` dans `snake.settings`.
+- Les types de map Snake sont definis dans `src/maps.js`; le choix de map est un champ de `src/settings.js`, persiste dans `snake.settings`, et une nouvelle partie applique la map selectionnee.
+- Le choix de couleur du serpent est centralise dans `src/snake-colors.js` et stocke dans `settings.snakeColor`; `settings.keepSnakeColorOnRestart` rend explicite si `Rejouer` garde la couleur ou revient au vert par defaut.
+- Les meilleurs scores sont segmentes dans `snake.bestScores.v2` par `settings.map`, `settings.mode` et vitesse effective de `getEffectiveSpeedOption`; l'ancien `snake.bestScore` global est ignore car il ne permet pas de connaitre le contexte.

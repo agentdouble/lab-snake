@@ -1,4 +1,6 @@
-import { scoreContextKey } from "./contexts.js";
+import { getEffectiveSpeedOption, normalizeSettings } from "./settings.js";
+
+const SETTINGS_KEY = "snake.settings";
 
 export const STORAGE_KEYS = Object.freeze({
   legacyBestScore: "snake.bestScore",
@@ -6,13 +8,13 @@ export const STORAGE_KEYS = Object.freeze({
 });
 
 // The legacy value was global, so v2 ignores it instead of guessing a context.
-export function loadBestScore(context) {
+export function loadBestScore(settings) {
   const bestScores = loadBestScores();
 
-  return bestScores[scoreContextKey(context)] ?? 0;
+  return bestScores[scoreContextKey(settings)] ?? 0;
 }
 
-export function saveBestScore(context, bestScore) {
+export function saveBestScore(settings, bestScore) {
   const storage = getLocalStorage();
 
   if (!storage) {
@@ -20,7 +22,7 @@ export function saveBestScore(context, bestScore) {
   }
 
   const bestScores = loadBestScores();
-  const key = scoreContextKey(context);
+  const key = scoreContextKey(settings);
   const previousBestScore = bestScores[key] ?? 0;
   const nextBestScore = Math.max(previousBestScore, sanitizeScore(bestScore));
 
@@ -60,6 +62,13 @@ export function loadBestScores() {
   }
 }
 
+export function scoreContextKey(settings = {}) {
+  const normalizedSettings = normalizeSettings(settings);
+  const effectiveSpeed = getEffectiveSpeedOption(normalizedSettings);
+
+  return `map=${normalizedSettings.map}|mode=${normalizedSettings.mode}|speed=${effectiveSpeed.id}`;
+}
+
 function sanitizeScore(value) {
   const parsedValue = Number.parseInt(value ?? "0", 10);
 
@@ -68,4 +77,34 @@ function sanitizeScore(value) {
 
 function getLocalStorage() {
   return globalThis.window?.localStorage ?? globalThis.localStorage ?? null;
+}
+
+export function loadSettings() {
+  const storage = getLocalStorage();
+
+  if (!storage) {
+    return normalizeSettings();
+  }
+
+  const value = storage.getItem(SETTINGS_KEY);
+
+  if (!value) {
+    return normalizeSettings();
+  }
+
+  try {
+    return normalizeSettings(JSON.parse(value));
+  } catch {
+    return normalizeSettings();
+  }
+}
+
+export function saveSettings(settings) {
+  const storage = getLocalStorage();
+
+  if (!storage) {
+    return;
+  }
+
+  storage.setItem(SETTINGS_KEY, JSON.stringify(normalizeSettings(settings)));
 }

@@ -1,50 +1,68 @@
-import { DIRECTIONS, GAME_MAPS, GAME_MODES, SPEED_PRESETS, START_DELAY_MS, STATUS } from "./constants.js";
-import { createGameContext, sameGameContext } from "./contexts.js";
+import { DIRECTIONS, START_DELAY_MS, STATUS } from "./constants.js";
 import {
   createInitialState,
   getTickDelay,
   pauseGame,
   queueDirection,
   resetGame,
+  resumeGame,
   startGame,
   stepState
 } from "./engine.js";
 import { bindKeyboard, bindTouch } from "./input.js";
 import { createRenderer } from "./renderer.js";
-import { loadBestScore, saveBestScore } from "./storage.js";
+import {
+  COLOR_THEMES,
+  DEFAULT_GAME_SETTINGS,
+  GAME_MODES,
+  MAP_OPTIONS,
+  SPEED_OPTIONS,
+  getEffectiveSpeedOption,
+  getGameMode,
+  getMapOption,
+  isSpeedLockedByMode,
+  normalizeSettings
+} from "./settings.js";
+import { DEFAULT_SNAKE_COLOR_ID, SNAKE_COLOR_OPTIONS } from "./snake-colors.js";
+import { loadBestScore, loadSettings, saveBestScore, saveSettings, scoreContextKey } from "./storage.js";
 
 const canvas = document.querySelector("#game-canvas");
 const scoreValue = document.querySelector("#score-value");
 const bestValue = document.querySelector("#best-value");
 const speedValue = document.querySelector("#speed-value");
+const modeValue = document.querySelector("#mode-value");
+const mapValue = document.querySelector("#map-value");
 const statusLabel = document.querySelector("#status-label");
-const mapSelect = document.querySelector("#map-select");
-const modeSelect = document.querySelector("#mode-select");
-const speedSelect = document.querySelector("#speed-select");
 const playButton = document.querySelector("#play-button");
 const pauseButton = document.querySelector("#pause-button");
 const restartButton = document.querySelector("#restart-button");
+const settingsButton = document.querySelector("#settings-button");
+const settingsDialog = document.querySelector("#settings-dialog");
+const settingsForm = document.querySelector("#settings-form");
+const modeSetting = document.querySelector("#mode-setting");
+const speedSetting = document.querySelector("#speed-setting");
+const speedSettingLabel = document.querySelector("#speed-setting-label");
+const colorSetting = document.querySelector("#color-setting");
+const gridSetting = document.querySelector("#grid-setting");
+const mapSetting = document.querySelector("#map-setting");
+const snakeColorOptions = document.querySelector("#snake-color-options");
+const keepColorToggle = document.querySelector("#keep-color-toggle");
+const settingsResetButton = document.querySelector("#settings-reset-button");
 const render = createRenderer(canvas);
 
-populateSelect(mapSelect, GAME_MAPS);
-populateSelect(modeSelect, GAME_MODES);
-populateSelect(speedSelect, SPEED_PRESETS);
-
-let activeContext = getSelectedContext();
-let state = createInitialState({
-  context: activeContext,
-  bestScore: loadBestScore(activeContext)
-});
+let settings = loadSettings();
+let state = createInitialState({ bestScore: loadBestScore(settings), mapId: settings.map });
 let loopTimer = null;
+let resumeAfterSettings = false;
 
 function setState(nextState, options = {}) {
   state = nextState;
 
   if (options.persistBestScore) {
-    saveBestScore(state.context, state.bestScore);
+    saveBestScore(settings, state.bestScore);
   }
 
-  render(state);
+  render(state, settings);
   updateHud();
 }
 
@@ -69,7 +87,7 @@ function scheduleTick() {
     return;
   }
 
-  loopTimer = window.setTimeout(runTick, getTickDelay(state.score));
+  loopTimer = window.setTimeout(runTick, getTickDelay(state.score, currentSpeedOption().multiplier));
 }
 
 function clearTick() {
@@ -82,24 +100,53 @@ function clearTick() {
 }
 
 function play() {
+  if (state.status !== STATUS.READY) {
+    return;
+  }
+
   setState(startGame(state));
   scheduleTick();
   canvas.focus();
 }
 
-function pause() {
-  setState(pauseGame(state));
-  clearTick();
+function togglePause(options = {}) {
+  const { focusCanvas = true } = options;
+
+  if (state.status === STATUS.RUNNING) {
+    clearTick();
+    setState(pauseGame(state));
+    if (focusCanvas) {
+      canvas.focus();
+    }
+    return;
+  }
+
+  if (state.status === STATUS.PAUSED) {
+    setState(resumeGame(state));
+    scheduleTick();
+    if (focusCanvas) {
+      canvas.focus();
+    }
+  }
 }
 
 function restart() {
   clearTick();
-  setState(resetGame(state));
+
+  if (!settings.keepSnakeColorOnRestart) {
+    setSettings({ ...settings, snakeColor: DEFAULT_SNAKE_COLOR_ID }, { reschedule: false });
+  }
+
+  setState(resetGame(state, { bestScore: loadBestScore(settings), mapId: settings.map }));
   canvas.focus();
 }
 
 function handleDirection(direction) {
-  if (state.status === STATUS.READY || state.status === STATUS.PAUSED) {
+  if (isSettingsOpen()) {
+    return;
+  }
+
+  if (state.status === STATUS.READY) {
     state = startGame(state);
   }
 
@@ -108,46 +155,201 @@ function handleDirection(direction) {
 }
 
 function updateHud() {
+  const speedOption = currentSpeedOption();
+  const mode = getGameMode(settings.mode);
+  const mapOption = currentMapOption();
+
   scoreValue.textContent = String(state.score);
   bestValue.textContent = String(state.bestScore);
-  speedValue.textContent = `${(START_DELAY_MS / getTickDelay(state.score, state.context.speedId)).toFixed(1)}x`;
-  statusLabel.textContent = statusText(state.status);
-  playButton.disabled = state.status === STATUS.RUNNING || state.status === STATUS.GAME_OVER || state.status === STATUS.WON;
-  pauseButton.disabled = state.status !== STATUS.RUNNING;
+  modeValue.textContent = mode.label;
+  speedValue.textContent = `${speedOption.label} ${(START_DELAY_MS / getTickDelay(state.score, speedOption.multiplier)).toFixed(1)}x`;
+  mapValue.textContent = mapOption.label;
+  statusLabel.textContent = isSettingsOpen() ? "Reglages" : statusText(state.status);
+  playButton.disabled = state.status !== STATUS.READY;
+  pauseButton.disabled = state.status !== STATUS.RUNNING && state.status !== STATUS.PAUSED;
+  pauseButton.textContent = state.status === STATUS.PAUSED ? "Reprendre" : "Pause";
+  pauseButton.setAttribute("aria-pressed", String(state.status === STATUS.PAUSED));
 }
 
-function handleContextChange() {
-  const nextContext = getSelectedContext();
+function currentSpeedOption() {
+  return getEffectiveSpeedOption(settings);
+}
 
-  if (sameGameContext(activeContext, nextContext)) {
+function currentMapOption() {
+  return getMapOption(settings.map);
+}
+
+function populateSettingsControls() {
+  modeSetting.replaceChildren(...GAME_MODES.map(createOptionElement));
+  speedSetting.replaceChildren(...SPEED_OPTIONS.map(createOptionElement));
+  colorSetting.replaceChildren(...COLOR_THEMES.map(createOptionElement));
+  mapSetting.replaceChildren(...MAP_OPTIONS.map(createMapOptionElement));
+  snakeColorOptions.replaceChildren(...SNAKE_COLOR_OPTIONS.map(createColorButton));
+  syncSettingsControls();
+}
+
+function createOptionElement(option) {
+  const element = document.createElement("option");
+
+  element.value = option.id;
+  element.textContent = option.label;
+
+  return element;
+}
+
+function createMapOptionElement(option) {
+  const element = createOptionElement(option);
+
+  element.textContent = `${option.label} - ${option.summary}`;
+
+  return element;
+}
+
+function createColorButton(option) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "color-choice";
+  button.dataset.colorId = option.id;
+  button.style.setProperty("--snake-color", option.fill);
+  button.style.setProperty("--snake-accent", option.accent);
+  button.textContent = option.label;
+  button.setAttribute("aria-pressed", "false");
+
+  return button;
+}
+
+function syncSettingsControls() {
+  const speedLocked = isSpeedLockedByMode(settings.mode);
+
+  modeSetting.value = settings.mode;
+  speedSetting.value = currentSpeedOption().id;
+  speedSetting.disabled = speedLocked;
+  speedSettingLabel.textContent = speedLocked ? "Vitesse du mode" : "Vitesse";
+  colorSetting.value = settings.color;
+  gridSetting.checked = settings.showGrid;
+  mapSetting.value = settings.map;
+  keepColorToggle.checked = settings.keepSnakeColorOnRestart;
+  updateColorControls();
+}
+
+function updateColorControls() {
+  for (const button of snakeColorOptions.querySelectorAll("[data-color-id]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.colorId === settings.snakeColor));
+  }
+}
+
+function setSettings(nextSettings, options = {}) {
+  const { reschedule = true } = options;
+  const currentScoreContextKey = scoreContextKey(settings);
+  const nextNormalizedSettings = normalizeSettings(nextSettings);
+  const scoreContextChanged = scoreContextKey(nextNormalizedSettings) !== currentScoreContextKey;
+
+  settings = nextNormalizedSettings;
+  savePersistableSettings();
+  syncSettingsControls();
+
+  if (scoreContextChanged) {
+    resumeAfterSettings = false;
+    clearTick();
+    setState(resetGame(state, { bestScore: loadBestScore(settings), mapId: settings.map }));
     return;
   }
 
-  activeContext = nextContext;
+  render(state, settings);
+  updateHud();
+
+  if (reschedule && state.status === STATUS.RUNNING && !isSettingsOpen()) {
+    clearTick();
+    scheduleTick();
+  }
+}
+
+function handleSettingsChange(event) {
+  setSettings({
+    ...settings,
+    mode: modeSetting.value,
+    speed: event.target === speedSetting ? speedSetting.value : settings.speed,
+    color: colorSetting.value,
+    showGrid: gridSetting.checked,
+    map: mapSetting.value
+  });
+}
+
+function savePersistableSettings() {
+  const settingsToSave = settings.keepSnakeColorOnRestart
+    ? settings
+    : { ...settings, snakeColor: DEFAULT_SNAKE_COLOR_ID };
+
+  saveSettings(settingsToSave);
+}
+
+function setSnakeColor(colorId) {
+  setSettings({
+    ...settings,
+    snakeColor: colorId
+  });
+}
+
+function setKeepColorOnRestart(keepColor) {
+  setSettings({
+    ...settings,
+    keepSnakeColorOnRestart: keepColor
+  });
+}
+
+function openSettings() {
+  if (isSettingsOpen()) {
+    return;
+  }
+
+  resumeAfterSettings = state.status === STATUS.RUNNING;
   clearTick();
-  setState(
-    resetGame(state, {
-      context: activeContext,
-      bestScore: loadBestScore(activeContext)
-    })
-  );
+  syncSettingsControls();
+  showSettingsDialog();
+  settingsButton.setAttribute("aria-expanded", "true");
+  updateHud();
+  modeSetting.focus();
 }
 
-function getSelectedContext() {
-  return createGameContext({
-    mapId: mapSelect.value,
-    modeId: modeSelect.value,
-    speedId: speedSelect.value
-  });
+function showSettingsDialog() {
+  if (typeof settingsDialog.showModal === "function") {
+    settingsDialog.showModal();
+    return;
+  }
+
+  settingsDialog.setAttribute("open", "");
 }
 
-function populateSelect(select, options) {
-  options.forEach((option) => {
-    const element = document.createElement("option");
-    element.value = option.id;
-    element.textContent = option.label;
-    select.append(element);
-  });
+function closeSettingsDialog() {
+  if (!isSettingsOpen()) {
+    return;
+  }
+
+  if (typeof settingsDialog.close === "function") {
+    settingsDialog.close();
+    return;
+  }
+
+  settingsDialog.removeAttribute("open");
+  handleSettingsClosed();
+}
+
+function isSettingsOpen() {
+  return settingsDialog.open || settingsDialog.hasAttribute("open");
+}
+
+function handleSettingsClosed() {
+  const shouldResume = resumeAfterSettings && state.status === STATUS.RUNNING;
+
+  resumeAfterSettings = false;
+  settingsButton.setAttribute("aria-expanded", "false");
+  updateHud();
+
+  if (shouldResume) {
+    scheduleTick();
+  }
+
+  settingsButton.focus();
 }
 
 function isTerminalStatus(status) {
@@ -171,21 +373,57 @@ function statusText(status) {
 }
 
 playButton.addEventListener("click", play);
-pauseButton.addEventListener("click", pause);
+pauseButton.addEventListener("click", togglePause);
 restartButton.addEventListener("click", restart);
-mapSelect.addEventListener("change", handleContextChange);
-modeSelect.addEventListener("change", handleContextChange);
-speedSelect.addEventListener("change", handleContextChange);
+settingsButton.addEventListener("click", openSettings);
+settingsForm.addEventListener("submit", (event) => {
+  if (typeof settingsDialog.close !== "function") {
+    event.preventDefault();
+    closeSettingsDialog();
+  }
+});
+modeSetting.addEventListener("change", handleSettingsChange);
+speedSetting.addEventListener("change", handleSettingsChange);
+colorSetting.addEventListener("change", handleSettingsChange);
+gridSetting.addEventListener("change", handleSettingsChange);
+mapSetting.addEventListener("change", handleSettingsChange);
+snakeColorOptions.addEventListener("click", (event) => {
+  if (!(event.target instanceof Element)) {
+    return;
+  }
 
-bindKeyboard(handleDirection);
+  const colorButton = event.target.closest("[data-color-id]");
+
+  if (!colorButton) {
+    return;
+  }
+
+  setSnakeColor(colorButton.dataset.colorId);
+});
+keepColorToggle.addEventListener("change", () => {
+  setKeepColorOnRestart(keepColorToggle.checked);
+});
+settingsResetButton.addEventListener("click", () => setSettings(DEFAULT_GAME_SETTINGS));
+settingsDialog.addEventListener("close", handleSettingsClosed);
+settingsDialog.addEventListener("click", (event) => {
+  if (event.target === settingsDialog) {
+    closeSettingsDialog();
+  }
+});
+
+populateSettingsControls();
+
+bindKeyboard(handleDirection, {
+  shouldIgnore: isSettingsOpen
+});
 bindTouch(canvas, handleDirection);
 
 window.addEventListener("blur", () => {
   if (state.status === STATUS.RUNNING) {
-    pause();
+    togglePause({ focusCanvas: false });
   }
 });
 
-window.addEventListener("resize", () => render(state));
+window.addEventListener("resize", () => render(state, settings));
 
 setState(queueDirection(state, DIRECTIONS.RIGHT));
