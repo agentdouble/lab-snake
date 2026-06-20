@@ -10,7 +10,7 @@ import { getMapDefinition } from "./maps.js";
 export function createInitialState(options = {}) {
   const {
     bestScore = 0,
-    randomizer = Math.random,
+    randomizer,
     apple
   } = options;
 
@@ -18,10 +18,11 @@ export function createInitialState(options = {}) {
   const snake = options.snake ?? map.startSnake;
   const direction = options.direction ?? map.startDirection ?? DIRECTIONS.RIGHT;
   const initialSnake = snake.map(copyCell);
+  const initialRandomizer = randomizer ?? Math.random;
   const initialApple =
     apple && isFreeCell(apple, initialSnake, map)
       ? copyCell(apple)
-      : randomFreeCell(initialSnake, randomizer, map);
+      : randomFreeCell(initialSnake, initialRandomizer, map);
 
   return {
     map,
@@ -32,7 +33,8 @@ export function createInitialState(options = {}) {
     score: 0,
     bestScore,
     status: STATUS.READY,
-    ticks: 0
+    ticks: 0,
+    ...(randomizer ? { randomizer } : {})
   };
 }
 
@@ -49,7 +51,8 @@ export function restoreState(snapshot, options = {}) {
     score: snapshot.score,
     bestScore,
     status: snapshot.status,
-    ticks: snapshot.ticks
+    ticks: snapshot.ticks,
+    ...(options.randomizer ? { randomizer: options.randomizer } : {})
   };
 }
 
@@ -106,7 +109,7 @@ export function queueDirection(state, direction) {
   };
 }
 
-export function stepState(state, randomizer = Math.random) {
+export function stepState(state, randomizer = state.randomizer ?? Math.random) {
   if (state.status !== STATUS.RUNNING) {
     return state;
   }

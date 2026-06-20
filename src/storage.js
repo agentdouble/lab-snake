@@ -3,6 +3,7 @@ import { getMapDefinition } from "./maps.js";
 import { normalizeSettings } from "./settings.js";
 
 const BEST_SCORE_KEY = "snake.bestScore";
+const CHALLENGE_BEST_SCORE_PREFIX = "snake.challengeBestScore.";
 const SETTINGS_KEY = "snake.settings";
 const SAVED_GAME_KEY = "snake.currentGame";
 const SAVED_GAME_VERSION = 2;
@@ -15,14 +16,19 @@ const ENGINE_SETTINGS = Object.freeze({
 });
 
 export function loadBestScore() {
-  const value = window.localStorage.getItem(BEST_SCORE_KEY);
-  const parsedValue = Number.parseInt(value ?? "0", 10);
-
-  return Number.isFinite(parsedValue) ? parsedValue : 0;
+  return loadStoredScore(BEST_SCORE_KEY);
 }
 
 export function saveBestScore(bestScore) {
-  window.localStorage.setItem(BEST_SCORE_KEY, String(bestScore));
+  saveStoredScore(BEST_SCORE_KEY, bestScore);
+}
+
+export function loadChallengeBestScore(seed) {
+  return loadStoredScore(challengeBestScoreKey(seed));
+}
+
+export function saveChallengeBestScore(seed, bestScore) {
+  saveStoredScore(challengeBestScoreKey(seed), bestScore);
 }
 
 export function loadSettings() {
@@ -259,4 +265,19 @@ function cellKey(cell) {
 
 function copyCell(cell) {
   return { x: cell.x, y: cell.y };
+}
+
+function loadStoredScore(key) {
+  const value = window.localStorage.getItem(key);
+  const parsedValue = Number.parseInt(value ?? "0", 10);
+
+  return Number.isFinite(parsedValue) ? parsedValue : 0;
+}
+
+function saveStoredScore(key, bestScore) {
+  window.localStorage.setItem(key, String(bestScore));
+}
+
+function challengeBestScoreKey(seed) {
+  return `${CHALLENGE_BEST_SCORE_PREFIX}${encodeURIComponent(seed)}`;
 }

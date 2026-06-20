@@ -15,6 +15,7 @@ import {
   stepState
 } from "../src/engine.js";
 import { getMapDefinition } from "../src/maps.js";
+import { createSeededRandomizer, getDailyChallengeSeed } from "../src/seed.js";
 
 test("the snake grows and scores when it eats an apple", () => {
   const state = startGame(
@@ -163,6 +164,43 @@ test("the game accelerates without passing the minimum delay", () => {
   assert.equal(getTickDelay(0), 145);
   assert.equal(getTickDelay(10), 95);
   assert.equal(getTickDelay(1000), 62);
+});
+
+test("daily challenge seeds are derived from the local calendar day", () => {
+  const seed = getDailyChallengeSeed(new Date(2026, 5, 20, 12));
+
+  assert.equal(seed, "daily-2026-06-20");
+});
+
+test("a shared seed reproduces the initial apple placement", () => {
+  const seed = "shared-seed-42";
+  const firstState = createInitialState({ mapId: "canyon", randomizer: createSeededRandomizer(seed) });
+  const secondState = createInitialState({ mapId: "canyon", randomizer: createSeededRandomizer(seed) });
+
+  assert.deepEqual(firstState.apple, secondState.apple);
+  assert.equal(isValidMapCell(firstState.apple, firstState.map), true);
+});
+
+test("a shared seed reproduces future apple placement", () => {
+  const seed = "shared-seed-future";
+  const firstState = startGame(
+    createInitialState({
+      apple: { x: 10, y: 10 },
+      randomizer: createSeededRandomizer(seed)
+    })
+  );
+  const secondState = startGame(
+    createInitialState({
+      apple: { x: 10, y: 10 },
+      randomizer: createSeededRandomizer(seed)
+    })
+  );
+
+  const firstNextState = stepState(firstState);
+  const secondNextState = stepState(secondState);
+
+  assert.equal(firstNextState.score, 1);
+  assert.deepEqual(firstNextState.apple, secondNextState.apple);
 });
 
 test("a saved state can be restored without losing the existing best score", () => {

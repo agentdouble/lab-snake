@@ -29,7 +29,7 @@
           <strong id="score-value">0</strong>
         </div>
         <div class="stat-block">
-          <span class="stat-label">Meilleur</span>
+          <span class="stat-label" id="best-label">Meilleur</span>
           <strong id="best-value">0</strong>
         </div>
         <div class="stat-block">
@@ -44,6 +44,26 @@
           <span class="stat-label">Map</span>
           <strong id="map-value">Classique</strong>
         </div>
+      </section>
+
+      <section class="challenge-panel" aria-label="Defis">
+        <div class="mode-switch" aria-label="Mode de jeu">
+          <button class="mode-button" type="button" id="classic-mode-button" aria-pressed="true">Classique</button>
+          <button class="mode-button" type="button" id="daily-challenge-button" aria-pressed="false">Defi du jour</button>
+        </div>
+        <div class="seed-controls">
+          <label class="seed-label" for="challenge-seed-input">Seed</label>
+          <input
+            id="challenge-seed-input"
+            class="seed-input"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+          >
+          <button class="mode-button" type="button" id="seed-challenge-button">Lancer</button>
+          <button class="mode-button" type="button" id="copy-seed-button" disabled>Copier</button>
+        </div>
+        <div class="challenge-note" id="challenge-note">Mode classique</div>
       </section>
 
       <section class="board-wrap" aria-label="Plateau">
