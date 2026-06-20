@@ -1,11 +1,10 @@
 import { CANVAS_SIZE, GRID_SIZE, STATUS } from "./constants.js";
+import { getSnakeColor } from "./snake-colors.js";
 
 const COLORS = Object.freeze({
   board: "#111714",
   grid: "rgba(214, 236, 218, 0.08)",
-  snakeHead: "#d8f75c",
-  snakeBody: "#4fd06b",
-  snakeShadow: "#19724d",
+  snakeEdge: "rgba(7, 12, 10, 0.82)",
   apple: "#ef476f",
   appleCore: "#ffd166",
   overlay: "rgba(11, 13, 12, 0.58)",
@@ -15,11 +14,13 @@ const COLORS = Object.freeze({
 export function createRenderer(canvas) {
   const context = canvas.getContext("2d");
 
-  return function render(state) {
+  return function render(state, options = {}) {
+    const snakeColor = getSnakeColor(options.snakeColorId);
+
     context.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
     drawBoard(context);
     drawApple(context, state.apple);
-    drawSnake(context, state.snake);
+    drawSnake(context, state.snake, snakeColor);
     drawStatus(context, state.status);
   };
 }
@@ -47,13 +48,13 @@ function drawBoard(context) {
   }
 }
 
-function drawSnake(context, snake) {
+function drawSnake(context, snake, snakeColor) {
   snake.forEach((cell, index) => {
     const isHead = index === 0;
-    drawRoundedCell(context, cell, isHead ? COLORS.snakeHead : COLORS.snakeBody, isHead ? 4 : 5);
+    drawRoundedCell(context, cell, snakeColor.fill, isHead ? 4 : 5, COLORS.snakeEdge);
 
     if (isHead) {
-      drawRoundedCell(context, cell, COLORS.snakeShadow, 11);
+      drawRoundedCell(context, cell, snakeColor.accent, 11);
     }
   });
 }
@@ -78,7 +79,7 @@ function drawApple(context, apple) {
   context.fill();
 }
 
-function drawRoundedCell(context, cell, color, inset) {
+function drawRoundedCell(context, cell, color, inset, strokeColor = null) {
   const cellSize = CANVAS_SIZE / GRID_SIZE;
   const x = cell.x * cellSize + inset;
   const y = cell.y * cellSize + inset;
@@ -89,6 +90,12 @@ function drawRoundedCell(context, cell, color, inset) {
   context.beginPath();
   context.roundRect(x, y, size, size, radius);
   context.fill();
+
+  if (strokeColor) {
+    context.strokeStyle = strokeColor;
+    context.lineWidth = 2;
+    context.stroke();
+  }
 }
 
 function drawStatus(context, status) {

@@ -10,18 +10,30 @@ import {
 } from "./engine.js";
 import { bindKeyboard, bindTouch } from "./input.js";
 import { createRenderer } from "./renderer.js";
-import { loadBestScore, saveBestScore } from "./storage.js";
+import { DEFAULT_SNAKE_COLOR_ID, SNAKE_COLOR_OPTIONS, normalizeSnakeColorId } from "./snake-colors.js";
+import {
+  loadBestScore,
+  loadKeepSnakeColorOnRestart,
+  loadSnakeColorId,
+  saveBestScore,
+  saveKeepSnakeColorOnRestart,
+  saveSnakeColorId
+} from "./storage.js";
 
 const canvas = document.querySelector("#game-canvas");
 const scoreValue = document.querySelector("#score-value");
 const bestValue = document.querySelector("#best-value");
 const speedValue = document.querySelector("#speed-value");
 const statusLabel = document.querySelector("#status-label");
+const snakeColorOptions = document.querySelector("#snake-color-options");
+const keepColorToggle = document.querySelector("#keep-color-toggle");
 const playButton = document.querySelector("#play-button");
 const pauseButton = document.querySelector("#pause-button");
 const restartButton = document.querySelector("#restart-button");
 const render = createRenderer(canvas);
 
+let keepColorOnRestart = loadKeepSnakeColorOnRestart();
+let snakeColorId = keepColorOnRestart ? loadSnakeColorId() : DEFAULT_SNAKE_COLOR_ID;
 let state = createInitialState({ bestScore: loadBestScore() });
 let loopTimer = null;
 
@@ -32,7 +44,7 @@ function setState(nextState, options = {}) {
     saveBestScore(state.bestScore);
   }
 
-  render(state);
+  render(state, { snakeColorId });
   updateHud();
 }
 
@@ -80,6 +92,12 @@ function pause() {
 
 function restart() {
   clearTick();
+
+  if (!keepColorOnRestart) {
+    snakeColorId = DEFAULT_SNAKE_COLOR_ID;
+    updateColorControls();
+  }
+
   setState(resetGame(state));
   canvas.focus();
 }
@@ -102,6 +120,53 @@ function updateHud() {
   pauseButton.disabled = state.status !== STATUS.RUNNING;
 }
 
+function buildColorControls() {
+  snakeColorOptions.replaceChildren(...SNAKE_COLOR_OPTIONS.map(createColorButton));
+  keepColorToggle.checked = keepColorOnRestart;
+  updateColorControls();
+}
+
+function createColorButton(option) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "color-choice";
+  button.dataset.colorId = option.id;
+  button.style.setProperty("--snake-color", option.fill);
+  button.style.setProperty("--snake-accent", option.accent);
+  button.textContent = option.label;
+  button.setAttribute("aria-pressed", "false");
+
+  return button;
+}
+
+function updateColorControls() {
+  for (const button of snakeColorOptions.querySelectorAll("[data-color-id]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.colorId === snakeColorId));
+  }
+}
+
+function setSnakeColor(colorId, options = {}) {
+  const { persist = true } = options;
+
+  snakeColorId = normalizeSnakeColorId(colorId);
+
+  if (persist && keepColorOnRestart) {
+    saveSnakeColorId(snakeColorId);
+  }
+
+  updateColorControls();
+  render(state, { snakeColorId });
+}
+
+function setKeepColorOnRestart(keepColor) {
+  keepColorOnRestart = keepColor;
+  saveKeepSnakeColorOnRestart(keepColorOnRestart);
+
+  if (keepColorOnRestart) {
+    saveSnakeColorId(snakeColorId);
+  }
+}
+
 function statusText(status) {
   switch (status) {
     case STATUS.RUNNING:
@@ -122,6 +187,24 @@ playButton.addEventListener("click", play);
 pauseButton.addEventListener("click", pause);
 restartButton.addEventListener("click", restart);
 
+snakeColorOptions.addEventListener("click", (event) => {
+  if (!(event.target instanceof Element)) {
+    return;
+  }
+
+  const colorButton = event.target.closest("[data-color-id]");
+
+  if (!colorButton) {
+    return;
+  }
+
+  setSnakeColor(colorButton.dataset.colorId);
+});
+
+keepColorToggle.addEventListener("change", () => {
+  setKeepColorOnRestart(keepColorToggle.checked);
+});
+
 bindKeyboard(handleDirection);
 bindTouch(canvas, handleDirection);
 
@@ -131,6 +214,7 @@ window.addEventListener("blur", () => {
   }
 });
 
-window.addEventListener("resize", () => render(state));
+window.addEventListener("resize", () => render(state, { snakeColorId }));
 
+buildColorControls();
 setState(queueDirection(state, DIRECTIONS.RIGHT));
