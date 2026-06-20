@@ -17,6 +17,7 @@ import {
   getSpeedOption,
   normalizeSettings
 } from "./settings.js";
+import { DEFAULT_SNAKE_COLOR_ID, SNAKE_COLOR_OPTIONS } from "./snake-colors.js";
 import { loadBestScore, loadSettings, saveBestScore, saveSettings } from "./storage.js";
 
 const canvas = document.querySelector("#game-canvas");
@@ -32,6 +33,8 @@ const settingsDialog = document.querySelector("#settings-dialog");
 const settingsForm = document.querySelector("#settings-form");
 const speedSetting = document.querySelector("#speed-setting");
 const colorSetting = document.querySelector("#color-setting");
+const snakeColorOptions = document.querySelector("#snake-color-options");
+const keepColorToggle = document.querySelector("#keep-color-toggle");
 const settingsResetButton = document.querySelector("#settings-reset-button");
 const render = createRenderer(canvas);
 
@@ -95,6 +98,11 @@ function pause() {
 
 function restart() {
   clearTick();
+
+  if (!settings.keepSnakeColorOnRestart) {
+    setSettings({ ...settings, snakeColor: DEFAULT_SNAKE_COLOR_ID }, { reschedule: false });
+  }
+
   setState(resetGame(state));
   canvas.focus();
 }
@@ -130,6 +138,7 @@ function currentSpeedOption() {
 function populateSettingsControls() {
   speedSetting.replaceChildren(...SPEED_OPTIONS.map(createOptionElement));
   colorSetting.replaceChildren(...COLOR_THEMES.map(createOptionElement));
+  snakeColorOptions.replaceChildren(...SNAKE_COLOR_OPTIONS.map(createColorButton));
   syncSettingsControls();
 }
 
@@ -142,28 +151,74 @@ function createOptionElement(option) {
   return element;
 }
 
+function createColorButton(option) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "color-choice";
+  button.dataset.colorId = option.id;
+  button.style.setProperty("--snake-color", option.fill);
+  button.style.setProperty("--snake-accent", option.accent);
+  button.textContent = option.label;
+  button.setAttribute("aria-pressed", "false");
+
+  return button;
+}
+
 function syncSettingsControls() {
   speedSetting.value = settings.speed;
   colorSetting.value = settings.color;
+  keepColorToggle.checked = settings.keepSnakeColorOnRestart;
+  updateColorControls();
 }
 
-function setSettings(nextSettings) {
+function updateColorControls() {
+  for (const button of snakeColorOptions.querySelectorAll("[data-color-id]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.colorId === settings.snakeColor));
+  }
+}
+
+function setSettings(nextSettings, options = {}) {
+  const { reschedule = true } = options;
+
   settings = normalizeSettings(nextSettings);
-  saveSettings(settings);
+  savePersistableSettings();
   syncSettingsControls();
   render(state, settings);
   updateHud();
 
-  if (state.status === STATUS.RUNNING && !isSettingsOpen()) {
+  if (reschedule && state.status === STATUS.RUNNING && !isSettingsOpen()) {
     clearTick();
     scheduleTick();
   }
 }
 
+function savePersistableSettings() {
+  const settingsToSave = settings.keepSnakeColorOnRestart
+    ? settings
+    : { ...settings, snakeColor: DEFAULT_SNAKE_COLOR_ID };
+
+  saveSettings(settingsToSave);
+}
+
 function handleSettingsChange() {
   setSettings({
+    ...settings,
     speed: speedSetting.value,
     color: colorSetting.value
+  });
+}
+
+function setSnakeColor(colorId) {
+  setSettings({
+    ...settings,
+    snakeColor: colorId
+  });
+}
+
+function setKeepColorOnRestart(keepColor) {
+  setSettings({
+    ...settings,
+    keepSnakeColorOnRestart: keepColor
   });
 }
 
@@ -248,6 +303,22 @@ settingsForm.addEventListener("submit", (event) => {
 });
 speedSetting.addEventListener("change", handleSettingsChange);
 colorSetting.addEventListener("change", handleSettingsChange);
+snakeColorOptions.addEventListener("click", (event) => {
+  if (!(event.target instanceof Element)) {
+    return;
+  }
+
+  const colorButton = event.target.closest("[data-color-id]");
+
+  if (!colorButton) {
+    return;
+  }
+
+  setSnakeColor(colorButton.dataset.colorId);
+});
+keepColorToggle.addEventListener("change", () => {
+  setKeepColorOnRestart(keepColorToggle.checked);
+});
 settingsResetButton.addEventListener("click", () => setSettings(DEFAULT_GAME_SETTINGS));
 settingsDialog.addEventListener("close", handleSettingsClosed);
 settingsDialog.addEventListener("click", (event) => {

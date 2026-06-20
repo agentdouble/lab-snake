@@ -1,16 +1,20 @@
 import { CANVAS_SIZE, GRID_SIZE, STATUS } from "./constants.js";
 import { getColorTheme } from "./settings.js";
+import { getSnakeColor } from "./snake-colors.js";
+
+const SNAKE_EDGE = "rgba(7, 12, 10, 0.82)";
 
 export function createRenderer(canvas) {
   const context = canvas.getContext("2d");
 
   return function render(state, settings) {
     const colors = getColorTheme(settings?.color).colors;
+    const snakeColor = getSnakeColor(settings?.snakeColor);
 
     context.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
     drawBoard(context, colors);
     drawApple(context, state.apple, colors);
-    drawSnake(context, state.snake, colors);
+    drawSnake(context, state.snake, snakeColor);
     drawStatus(context, state.status, colors);
   };
 }
@@ -38,13 +42,13 @@ function drawBoard(context, colors) {
   }
 }
 
-function drawSnake(context, snake, colors) {
+function drawSnake(context, snake, snakeColor) {
   snake.forEach((cell, index) => {
     const isHead = index === 0;
-    drawRoundedCell(context, cell, isHead ? colors.snakeHead : colors.snakeBody, isHead ? 4 : 5);
+    drawRoundedCell(context, cell, snakeColor.fill, isHead ? 4 : 5, SNAKE_EDGE);
 
     if (isHead) {
-      drawRoundedCell(context, cell, colors.snakeShadow, 11);
+      drawRoundedCell(context, cell, snakeColor.accent, 11);
     }
   });
 }
@@ -69,7 +73,7 @@ function drawApple(context, apple, colors) {
   context.fill();
 }
 
-function drawRoundedCell(context, cell, color, inset) {
+function drawRoundedCell(context, cell, color, inset, strokeColor = null) {
   const cellSize = CANVAS_SIZE / GRID_SIZE;
   const x = cell.x * cellSize + inset;
   const y = cell.y * cellSize + inset;
@@ -80,6 +84,12 @@ function drawRoundedCell(context, cell, color, inset) {
   context.beginPath();
   context.roundRect(x, y, size, size, radius);
   context.fill();
+
+  if (strokeColor) {
+    context.strokeStyle = strokeColor;
+    context.lineWidth = 2;
+    context.stroke();
+  }
 }
 
 function drawStatus(context, status, colors) {
