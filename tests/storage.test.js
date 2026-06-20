@@ -11,38 +11,36 @@ import {
   serializeGameState
 } from "../src/storage.js";
 
-test("game state snapshots include the playable state and active settings", () => {
-  const snapshot = serializeGameState({
-    snake: [
-      { x: 9, y: 10 },
-      { x: 8, y: 10 },
-      { x: 7, y: 10 }
-    ],
-    direction: DIRECTIONS.RIGHT,
-    directionQueue: [DIRECTIONS.DOWN],
-    apple: { x: 5, y: 6 },
-    score: 2,
-    bestScore: 3,
-    status: STATUS.RUNNING,
-    ticks: 4
-  });
+const ACTIVE_SETTINGS = Object.freeze({
+  mode: "quick",
+  speed: "expert",
+  color: "neon",
+  showGrid: false,
+  map: "wide",
+  snakeColor: "violet",
+  keepSnakeColorOnRestart: false
+});
 
-  assert.equal(snapshot.version, 1);
-  assert.deepEqual(snapshot.settings, {
-    gridSize: 20,
+test("game snapshots include the playable state and active settings", () => {
+  const snapshot = serializeGameState(createWideState({ status: STATUS.RUNNING }), ACTIVE_SETTINGS);
+
+  assert.equal(snapshot.version, 2);
+  assert.deepEqual(snapshot.engine, {
     startDelayMs: 145,
     minDelayMs: 62,
     delayStepMs: 5
   });
+  assert.deepEqual(snapshot.settings, ACTIVE_SETTINGS);
   assert.deepEqual(snapshot.state, {
+    map: "wide",
     snake: [
-      { x: 9, y: 10 },
-      { x: 8, y: 10 },
-      { x: 7, y: 10 }
+      { x: 11, y: 8 },
+      { x: 10, y: 8 },
+      { x: 9, y: 8 }
     ],
     direction: "right",
     directionQueue: ["down"],
-    apple: { x: 5, y: 6 },
+    apple: { x: 12, y: 8 },
     score: 2,
     bestScore: 3,
     status: STATUS.RUNNING,
@@ -50,75 +48,111 @@ test("game state snapshots include the playable state and active settings", () =
   });
 });
 
-test("obsolete or invalid saved games are ignored without clearing best score", () => {
+test("obsolete or invalid saved games are ignored without clearing best score", (t) => {
   const localStorage = createMemoryStorage();
   global.window = { localStorage };
+  t.after(() => {
+    delete global.window;
+  });
 
   saveBestScore(12);
-  localStorage.setItem("snake.currentGame", JSON.stringify({ version: 0 }));
+  localStorage.setItem("snake.currentGame", JSON.stringify({ version: 1 }));
 
   assert.equal(loadSavedGame(), null);
   assert.equal(loadBestScore(), 12);
   assert.equal(localStorage.getItem("snake.currentGame"), null);
-
-  delete global.window;
 });
 
-test("valid saved games round-trip through localStorage", () => {
+test("valid saved games round-trip through localStorage", (t) => {
   const localStorage = createMemoryStorage();
   global.window = { localStorage };
-
-  saveGameState({
-    snake: [
-      { x: 9, y: 10 },
-      { x: 8, y: 10 },
-      { x: 7, y: 10 }
-    ],
-    direction: DIRECTIONS.RIGHT,
-    directionQueue: [],
-    apple: { x: 2, y: 2 },
-    score: 0,
-    bestScore: 5,
-    status: STATUS.PAUSED,
-    ticks: 3
+  t.after(() => {
+    delete global.window;
   });
+
+  saveGameState(createWideState({ status: STATUS.PAUSED }), ACTIVE_SETTINGS);
 
   assert.deepEqual(loadSavedGame(), {
-    snake: [
-      { x: 9, y: 10 },
-      { x: 8, y: 10 },
-      { x: 7, y: 10 }
-    ],
-    direction: "right",
-    directionQueue: [],
-    apple: { x: 2, y: 2 },
-    score: 0,
-    bestScore: 5,
-    status: STATUS.PAUSED,
-    ticks: 3
+    settings: ACTIVE_SETTINGS,
+    state: {
+      map: "wide",
+      snake: [
+        { x: 11, y: 8 },
+        { x: 10, y: 8 },
+        { x: 9, y: 8 }
+      ],
+      direction: "right",
+      directionQueue: ["down"],
+      apple: { x: 12, y: 8 },
+      score: 2,
+      bestScore: 3,
+      status: STATUS.PAUSED,
+      ticks: 4
+    }
   });
-
-  delete global.window;
 });
 
 test("terminal saved games are not restored", () => {
-  const snapshot = serializeGameState({
-    snake: [
-      { x: 9, y: 10 },
-      { x: 8, y: 10 },
-      { x: 7, y: 10 }
-    ],
-    direction: DIRECTIONS.RIGHT,
-    directionQueue: [],
-    apple: { x: 2, y: 2 },
-    score: 0,
-    bestScore: 5,
-    status: STATUS.GAME_OVER,
-    ticks: 3
-  });
+  const snapshot = serializeGameState(createWideState({ status: STATUS.GAME_OVER }), ACTIVE_SETTINGS);
 
   assert.equal(normalizeSavedGame(snapshot), null);
 });
+
+test("saved games with stale settings are not restored", () => {
+  const snapshot = serializeGameState(createWideState({ status: STATUS.PAUSED }), ACTIVE_SETTINGS);
+
+  assert.equal(
+    normalizeSavedGame({
+      ...snapshot,
+      settings: {
+        ...snapshot.settings,
+        map: "missing-map"
+      }
+    }),
+    null
+  );
+});
+
+test("saved games with a state map that does not match settings are not restored", () => {
+  const snapshot = serializeGameState(createWideState({ status: STATUS.PAUSED }), ACTIVE_SETTINGS);
+
+  assert.equal(
+    normalizeSavedGame({
+      ...snapshot,
+      state: {
+        ...snapshot.state,
+        map: "classic"
+      }
+    }),
+    null
+  );
+});
+
+function createWideState(options = {}) {
+  return {
+    map: {
+      id: "wide",
+      width: 24,
+      height: 16,
+      obstacles: [
+        { x: 3, y: 4 },
+        { x: 4, y: 4 }
+      ]
+    },
+    snake: [
+      { x: 11, y: 8 },
+      { x: 10, y: 8 },
+      { x: 9, y: 8 }
+    ],
+    direction: DIRECTIONS.RIGHT,
+    directionQueue: [DIRECTIONS.DOWN],
+    apple: { x: 12, y: 8 },
+    score: 2,
+    bestScore: 3,
+    status: options.status ?? STATUS.RUNNING,
+    ticks: 4
+  };
+}
 
 function createMemoryStorage() {
   const values = new Map();
