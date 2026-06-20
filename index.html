@@ -10,7 +10,16 @@
     <main class="game-shell" aria-label="Snake">
       <header class="top-bar">
         <h1>Snake</h1>
-        <div class="status-pill" id="status-label">Pret</div>
+        <div class="header-actions">
+          <button
+            class="settings-button"
+            type="button"
+            id="settings-button"
+            aria-haspopup="dialog"
+            aria-controls="settings-dialog"
+          >Reglages</button>
+          <div class="status-pill" id="status-label">Pret</div>
+        </div>
       </header>
 
       <section class="score-strip" aria-label="Scores">
@@ -28,17 +37,6 @@
         </div>
       </section>
 
-      <section class="settings-strip" aria-label="Reglages">
-        <fieldset class="snake-color-field">
-          <legend>Couleur du serpent</legend>
-          <div class="color-options" id="snake-color-options"></div>
-        </fieldset>
-        <label class="color-persistence">
-          <input type="checkbox" id="keep-color-toggle">
-          <span>Garder pour Rejouer</span>
-        </label>
-      </section>
-
       <section class="board-wrap" aria-label="Plateau">
         <canvas
           id="game-canvas"
@@ -54,6 +52,40 @@
         <button class="control-button" type="button" id="pause-button">Pause</button>
         <button class="control-button" type="button" id="restart-button">Rejouer</button>
       </section>
+
+      <dialog class="settings-dialog" id="settings-dialog" aria-labelledby="settings-title">
+        <form class="settings-panel" method="dialog" id="settings-form">
+          <div class="settings-header">
+            <h2 id="settings-title">Reglages</h2>
+            <button class="settings-close" type="submit">Fermer</button>
+          </div>
+
+          <label class="settings-field" for="speed-setting">
+            <span>Vitesse</span>
+            <select id="speed-setting" name="speed"></select>
+          </label>
+
+          <label class="settings-field" for="color-setting">
+            <span>Theme</span>
+            <select id="color-setting" name="color"></select>
+          </label>
+
+          <fieldset class="settings-field snake-color-field">
+            <legend>Couleur du serpent</legend>
+            <div class="color-options" id="snake-color-options"></div>
+          </fieldset>
+
+          <label class="color-persistence">
+            <input type="checkbox" id="keep-color-toggle">
+            <span>Garder pour Rejouer</span>
+          </label>
+
+          <menu class="settings-actions">
+            <button class="control-button" type="button" id="settings-reset-button">Defaut</button>
+            <button class="control-button primary" type="submit">Valider</button>
+          </menu>
+        </form>
+      </dialog>
     </main>
 
     <script type="module" src="./src/main.js"></script>

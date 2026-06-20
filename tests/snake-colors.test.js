@@ -8,6 +8,7 @@ import {
   getSnakeColor,
   normalizeSnakeColorId
 } from "../src/snake-colors.js";
+import { COLOR_THEMES } from "../src/settings.js";
 
 test("snake color ids are normalized to a valid option", () => {
   assert.equal(normalizeSnakeColorId("cyan"), "cyan");
@@ -17,16 +18,18 @@ test("snake color ids are normalized to a valid option", () => {
 
 test("snake color options are unique readable colors", () => {
   const ids = new Set();
-  const appleColor = "#ef476f";
-  const boardColor = "#111714";
 
   for (const option of SNAKE_COLOR_OPTIONS) {
     assert.match(option.id, /^[a-z]+$/);
     assert.match(option.fill, /^#[0-9a-f]{6}$/i);
     assert.match(option.accent, /^#[0-9a-f]{6}$/i);
     assert.ok(!ids.has(option.id), `duplicate color id: ${option.id}`);
-    assert.notEqual(option.fill.toLowerCase(), appleColor);
-    assert.notEqual(option.fill.toLowerCase(), boardColor);
+
+    for (const theme of COLOR_THEMES) {
+      assert.notEqual(option.fill.toLowerCase(), theme.colors.apple.toLowerCase());
+      assert.notEqual(option.fill.toLowerCase(), theme.colors.board.toLowerCase());
+    }
+
     ids.add(option.id);
   }
 });
