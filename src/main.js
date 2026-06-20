@@ -43,6 +43,7 @@ const modeSetting = document.querySelector("#mode-setting");
 const speedSetting = document.querySelector("#speed-setting");
 const speedSettingLabel = document.querySelector("#speed-setting-label");
 const colorSetting = document.querySelector("#color-setting");
+const gridSetting = document.querySelector("#grid-setting");
 const mapSetting = document.querySelector("#map-setting");
 const snakeColorOptions = document.querySelector("#snake-color-options");
 const keepColorToggle = document.querySelector("#keep-color-toggle");
@@ -223,6 +224,7 @@ function syncSettingsControls() {
   speedSetting.disabled = speedLocked;
   speedSettingLabel.textContent = speedLocked ? "Vitesse du mode" : "Vitesse";
   colorSetting.value = settings.color;
+  gridSetting.checked = settings.showGrid;
   mapSetting.value = settings.map;
   keepColorToggle.checked = settings.keepSnakeColorOnRestart;
   updateColorControls();
@@ -265,6 +267,7 @@ function handleSettingsChange(event) {
     mode: modeSetting.value,
     speed: event.target === speedSetting ? speedSetting.value : settings.speed,
     color: colorSetting.value,
+    showGrid: gridSetting.checked,
     map: mapSetting.value
   });
 }
@@ -300,6 +303,7 @@ function openSettings() {
   clearTick();
   syncSettingsControls();
   showSettingsDialog();
+  settingsButton.setAttribute("aria-expanded", "true");
   updateHud();
   modeSetting.focus();
 }
@@ -335,6 +339,7 @@ function handleSettingsClosed() {
   const shouldResume = resumeAfterSettings && state.status === STATUS.RUNNING;
 
   resumeAfterSettings = false;
+  settingsButton.setAttribute("aria-expanded", "false");
   updateHud();
 
   if (shouldResume) {
@@ -373,6 +378,7 @@ settingsForm.addEventListener("submit", (event) => {
 modeSetting.addEventListener("change", handleSettingsChange);
 speedSetting.addEventListener("change", handleSettingsChange);
 colorSetting.addEventListener("change", handleSettingsChange);
+gridSetting.addEventListener("change", handleSettingsChange);
 mapSetting.addEventListener("change", handleSettingsChange);
 snakeColorOptions.addEventListener("click", (event) => {
   if (!(event.target instanceof Element)) {

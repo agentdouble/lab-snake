@@ -17,6 +17,7 @@
             id="settings-button"
             aria-haspopup="dialog"
             aria-controls="settings-dialog"
+            aria-expanded="false"
           >Reglages</button>
           <div class="status-pill" id="status-label">Pret</div>
         </div>
@@ -86,6 +87,14 @@
           <label class="settings-field" for="map-setting">
             <span>Map nouvelle partie</span>
             <select id="map-setting" name="map"></select>
+          </label>
+
+          <label class="settings-toggle" for="grid-setting">
+            <span>
+              <span class="settings-toggle-title">Grille</span>
+              <span class="settings-toggle-meta">Afficher le quadrillage du plateau</span>
+            </span>
+            <input type="checkbox" id="grid-setting" name="showGrid">
           </label>
 
           <fieldset class="settings-field snake-color-field">

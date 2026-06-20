@@ -41,6 +41,7 @@ test("settings normalization falls back to the default choices", () => {
       mode: "arcade",
       speed: "turbo",
       color: "unknown",
+      showGrid: "yes",
       map: "missing",
       snakeColor: "missing"
     }),
@@ -57,6 +58,7 @@ test("settings normalization accepts snake color persistence choices", () => {
   assert.deepEqual(normalizeSettings({
     speed: "slow",
     color: "neon",
+    showGrid: false,
     map: "wide",
     snakeColor: "cyan",
     keepSnakeColorOnRestart: false
@@ -64,6 +66,7 @@ test("settings normalization accepts snake color persistence choices", () => {
     mode: "standard",
     speed: "slow",
     color: "neon",
+    showGrid: false,
     map: "wide",
     snakeColor: "cyan",
     keepSnakeColorOnRestart: false

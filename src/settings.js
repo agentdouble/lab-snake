@@ -5,6 +5,7 @@ export const DEFAULT_GAME_SETTINGS = Object.freeze({
   mode: "standard",
   speed: "normal",
   color: "classic",
+  showGrid: true,
   map: DEFAULT_MAP_ID,
   snakeColor: DEFAULT_SNAKE_COLOR_ID,
   keepSnakeColorOnRestart: true
@@ -98,15 +99,17 @@ export const MAP_OPTIONS = Object.freeze(
 );
 
 export function normalizeSettings(settings = {}) {
-  const mode = getGameMode(settings.mode);
+  const candidate = settings && typeof settings === "object" ? settings : {};
+  const mode = getGameMode(candidate.mode);
 
   return {
     mode: mode.id,
-    speed: getSpeedOption(settings.speed).id,
-    color: getColorTheme(settings.color).id,
-    map: getMapOption(settings.map).id,
-    snakeColor: normalizeSnakeColorId(settings.snakeColor),
-    keepSnakeColorOnRestart: settings.keepSnakeColorOnRestart !== false
+    speed: getSpeedOption(candidate.speed).id,
+    color: getColorTheme(candidate.color).id,
+    showGrid: typeof candidate.showGrid === "boolean" ? candidate.showGrid : DEFAULT_GAME_SETTINGS.showGrid,
+    map: getMapOption(candidate.map).id,
+    snakeColor: normalizeSnakeColorId(candidate.snakeColor),
+    keepSnakeColorOnRestart: candidate.keepSnakeColorOnRestart !== false
   };
 }
 

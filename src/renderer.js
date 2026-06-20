@@ -14,14 +14,14 @@ const MAP_COLORS = Object.freeze({
 export function createRenderer(canvas) {
   const context = canvas.getContext("2d");
 
-  return function render(state, settings) {
+  return function render(state, settings = {}) {
     const colors = getColorTheme(settings?.color).colors;
     const map = getMapDefinition(state.map?.id);
     const metrics = getBoardMetrics(map);
     const snakeColor = getSnakeColor(settings?.snakeColor);
 
     context.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    drawBoard(context, map, metrics, colors);
+    drawBoard(context, map, metrics, colors, settings);
     drawObstacles(context, map.obstacles, metrics);
     drawApple(context, state.apple, metrics, colors);
     drawSnake(context, state.snake, metrics, snakeColor);
@@ -29,12 +29,17 @@ export function createRenderer(canvas) {
   };
 }
 
-function drawBoard(context, map, metrics, colors) {
+function drawBoard(context, map, metrics, colors, settings) {
   context.fillStyle = MAP_COLORS.outside;
   context.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
   context.fillStyle = colors.board;
   context.fillRect(metrics.offsetX, metrics.offsetY, metrics.width, metrics.height);
+
+  if (settings.showGrid === false) {
+    return;
+  }
+
   context.strokeStyle = colors.grid;
   context.lineWidth = 1;
 

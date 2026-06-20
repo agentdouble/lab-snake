@@ -11,13 +11,15 @@ npm start
 
 `npm start` sert le dossier sur `http://localhost:4173`.
 
-## Vitesse
+## Reglages
 
 Le menu `Reglages` propose le mode `Standard` et le `Mode rapide`. En mode
 standard, les vitesses `Lente`, `Normale`, `Rapide` et `Expert` restent
-selectionnables et sauvegardees localement. Le mode rapide verrouille la
-vitesse effective sur `Rapide` sans remplacer la vitesse manuelle sauvegardee.
-Le bouton `Defaut` revient au mode standard et a la vitesse `Normale`.
+selectionnables avec les themes de plateau, la bascule de grille et la map des
+nouvelles parties. Le mode rapide verrouille la vitesse effective sur `Rapide`
+sans remplacer la vitesse manuelle sauvegardee. Ces choix sont sauvegardes
+localement et s'appliquent a `Rejouer` comme aux prochaines parties. Le bouton
+`Defaut` revient aux reglages standards.
 
 ## Maps
 
