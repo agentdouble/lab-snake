@@ -5,3 +5,4 @@
 - Les tests utilisent le runner Node integre via `npm test`, avec les scenarios de base dans `tests/engine.test.js`.
 - Le depot GitHub cible est `https://github.com/agentdouble/lab-snake`; la branche de publication est `main`.
 - Les profils de vitesse du serpent sont definis dans `src/constants.js`, appliques par `getTickDelay(score, speedKey)` dans `src/engine.js`, et conserves par `resetGame` entre deux parties.
+- Le mode rapide est un mode de partie explicite (`modeKey: "quick"`) qui verrouille la vitesse sur le profil `fast`; choisir une vitesse manuelle repasse le mode en `standard` pour eviter les conflits de reglage.

@@ -11,6 +11,14 @@ export const SPEED_LEVELS = Object.freeze([
 ]);
 
 export const DEFAULT_SPEED_KEY = SPEED_LEVELS[0].key;
+export const QUICK_MODE_SPEED_KEY = "fast";
+
+export const GAME_MODES = Object.freeze([
+  Object.freeze({ key: "standard", label: "Standard", speedKey: null }),
+  Object.freeze({ key: "quick", label: "Mode rapide", speedKey: QUICK_MODE_SPEED_KEY })
+]);
+
+export const DEFAULT_MODE_KEY = GAME_MODES[0].key;
 
 export const STATUS = Object.freeze({
   READY: "ready",

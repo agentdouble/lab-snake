@@ -1,12 +1,15 @@
 import { DIRECTIONS, STATUS } from "./constants.js";
 import {
   createInitialState,
+  getGameMode,
   getSpeedLevel,
   getSpeedMultiplier,
   getTickDelay,
+  isSpeedLockedByMode,
   pauseGame,
   queueDirection,
   resetGame,
+  setGameMode,
   setSpeedLevel,
   startGame,
   stepState
@@ -19,10 +22,13 @@ const canvas = document.querySelector("#game-canvas");
 const scoreValue = document.querySelector("#score-value");
 const bestValue = document.querySelector("#best-value");
 const speedValue = document.querySelector("#speed-value");
+const modeValue = document.querySelector("#mode-value");
 const statusLabel = document.querySelector("#status-label");
 const playButton = document.querySelector("#play-button");
 const pauseButton = document.querySelector("#pause-button");
 const restartButton = document.querySelector("#restart-button");
+const modeButtons = [...document.querySelectorAll("[data-mode-key]")];
+const speedStripLabel = document.querySelector("#speed-strip-label");
 const speedButtons = [...document.querySelectorAll("[data-speed-key]")];
 const render = createRenderer(canvas);
 
@@ -89,11 +95,20 @@ function restart() {
 }
 
 function chooseSpeed(speedKey) {
-  if (state.status === STATUS.RUNNING) {
+  if (state.status === STATUS.RUNNING || isSpeedLockedByMode(state.modeKey)) {
     return;
   }
 
   setState(setSpeedLevel(state, speedKey));
+  canvas.focus();
+}
+
+function chooseMode(modeKey) {
+  if (state.status === STATUS.RUNNING) {
+    return;
+  }
+
+  setState(setGameMode(state, modeKey));
   canvas.focus();
 }
 
@@ -107,19 +122,31 @@ function handleDirection(direction) {
 }
 
 function updateHud() {
+  const gameMode = getGameMode(state.modeKey);
   const speedLevel = getSpeedLevel(state.speedKey);
+  const isSpeedLocked = isSpeedLockedByMode(state.modeKey);
 
   scoreValue.textContent = String(state.score);
   bestValue.textContent = String(state.bestScore);
+  modeValue.textContent = gameMode.label;
   speedValue.textContent = `${speedLevel.label} ${getSpeedMultiplier(state.score, state.speedKey).toFixed(1)}x`;
+  speedStripLabel.textContent = isSpeedLocked ? "Vitesse du mode" : "Vitesse manuelle";
   statusLabel.textContent = statusText(state.status);
   playButton.disabled = state.status === STATUS.RUNNING || state.status === STATUS.GAME_OVER || state.status === STATUS.WON;
   pauseButton.disabled = state.status !== STATUS.RUNNING;
 
+  modeButtons.forEach((button) => {
+    const isSelected = button.dataset.modeKey === state.modeKey;
+
+    button.disabled = state.status === STATUS.RUNNING;
+    button.setAttribute("aria-pressed", String(isSelected));
+    button.classList.toggle("selected", isSelected);
+  });
+
   speedButtons.forEach((button) => {
     const isSelected = button.dataset.speedKey === state.speedKey;
 
-    button.disabled = state.status === STATUS.RUNNING;
+    button.disabled = state.status === STATUS.RUNNING || isSpeedLocked;
     button.setAttribute("aria-pressed", String(isSelected));
     button.classList.toggle("selected", isSelected);
   });
@@ -144,6 +171,10 @@ function statusText(status) {
 playButton.addEventListener("click", play);
 pauseButton.addEventListener("click", pause);
 restartButton.addEventListener("click", restart);
+
+modeButtons.forEach((button) => {
+  button.addEventListener("click", () => chooseMode(button.dataset.modeKey));
+});
 
 speedButtons.forEach((button) => {
   button.addEventListener("click", () => chooseSpeed(button.dataset.speedKey));

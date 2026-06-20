@@ -26,10 +26,22 @@
           <span class="stat-label">Vitesse</span>
           <strong id="speed-value">1.0x</strong>
         </div>
+        <div class="stat-block">
+          <span class="stat-label">Mode</span>
+          <strong id="mode-value">Standard</strong>
+        </div>
+      </section>
+
+      <section class="mode-strip" aria-label="Mode de partie">
+        <span class="mode-strip-label">Mode</span>
+        <div class="mode-options" role="group" aria-label="Choix du mode de partie">
+          <button class="mode-option selected" type="button" data-mode-key="standard" aria-pressed="true">Standard</button>
+          <button class="mode-option" type="button" data-mode-key="quick" aria-pressed="false">Mode rapide</button>
+        </div>
       </section>
 
       <section class="speed-strip" aria-label="Vitesse du serpent">
-        <span class="speed-strip-label">Rythme</span>
+        <span class="speed-strip-label" id="speed-strip-label">Vitesse manuelle</span>
         <div class="speed-options" role="group" aria-label="Choix de vitesse">
           <button class="speed-option selected" type="button" data-speed-key="normal" aria-pressed="true">Normal</button>
           <button class="speed-option" type="button" data-speed-key="fast" aria-pressed="false">Rapide</button>

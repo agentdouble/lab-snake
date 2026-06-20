@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { DIRECTIONS, STATUS } from "../src/constants.js";
+import { DIRECTIONS, QUICK_MODE_SPEED_KEY, STATUS } from "../src/constants.js";
 import {
   createInitialState,
+  getGameMode,
   getTickDelay,
+  isSpeedLockedByMode,
   queueDirection,
   resetGame,
+  setGameMode,
   setSpeedLevel,
   startGame,
   stepState
@@ -77,6 +80,38 @@ test("restart preserves the selected speed level", () => {
   const restartedState = resetGame(state);
 
   assert.equal(restartedState.speedKey, "turbo");
+  assert.equal(restartedState.score, 0);
+  assert.equal(restartedState.status, STATUS.READY);
+});
+
+test("quick mode configures a faster game without manual speed changes", () => {
+  let state = createInitialState();
+
+  state = setGameMode(state, "quick");
+
+  assert.equal(state.modeKey, "quick");
+  assert.equal(getGameMode(state.modeKey).label, "Mode rapide");
+  assert.equal(state.speedKey, QUICK_MODE_SPEED_KEY);
+  assert.ok(isSpeedLockedByMode(state.modeKey));
+  assert.ok(getTickDelay(0, state.speedKey) < getTickDelay(0, "normal"));
+});
+
+test("manual speed selection leaves quick mode to avoid conflicting settings", () => {
+  let state = createInitialState({ modeKey: "quick" });
+
+  state = setSpeedLevel(state, "turbo");
+
+  assert.equal(state.modeKey, "standard");
+  assert.equal(state.speedKey, "turbo");
+  assert.equal(isSpeedLockedByMode(state.modeKey), false);
+});
+
+test("restart preserves quick mode and its locked speed", () => {
+  const state = setGameMode(createInitialState(), "quick");
+  const restartedState = resetGame(state);
+
+  assert.equal(restartedState.modeKey, "quick");
+  assert.equal(restartedState.speedKey, QUICK_MODE_SPEED_KEY);
   assert.equal(restartedState.score, 0);
   assert.equal(restartedState.status, STATUS.READY);
 });
