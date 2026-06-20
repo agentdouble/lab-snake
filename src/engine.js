@@ -16,23 +16,25 @@ const DEFAULT_SNAKE = Object.freeze([
 export function createInitialState(options = {}) {
   const {
     bestScore = 0,
-    randomizer = Math.random,
+    randomizer,
     snake = DEFAULT_SNAKE,
     direction = DIRECTIONS.RIGHT,
     apple
   } = options;
 
   const initialSnake = snake.map(copyCell);
+  const initialRandomizer = randomizer ?? Math.random;
 
   return {
     snake: initialSnake,
     direction,
     directionQueue: [],
-    apple: apple ? copyCell(apple) : randomFreeCell(initialSnake, randomizer),
+    apple: apple ? copyCell(apple) : randomFreeCell(initialSnake, initialRandomizer),
     score: 0,
     bestScore,
     status: STATUS.READY,
-    ticks: 0
+    ticks: 0,
+    ...(randomizer ? { randomizer } : {})
   };
 }
 
@@ -80,7 +82,7 @@ export function queueDirection(state, direction) {
   };
 }
 
-export function stepState(state, randomizer = Math.random) {
+export function stepState(state, randomizer = state.randomizer ?? Math.random) {
   if (state.status !== STATUS.RUNNING) {
     return state;
   }
