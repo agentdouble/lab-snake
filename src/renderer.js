@@ -1,85 +1,130 @@
-import { CANVAS_SIZE, GRID_SIZE, STATUS } from "./constants.js";
+import { CANVAS_SIZE, STATUS } from "./constants.js";
+import { getMapDefinition } from "./maps.js";
 import { getColorTheme } from "./settings.js";
+
+const MAP_COLORS = Object.freeze({
+  outside: "#0a0d0b",
+  wall: "#7b8490",
+  cellStroke: "rgba(6, 10, 8, 0.38)"
+});
 
 export function createRenderer(canvas) {
   const context = canvas.getContext("2d");
 
   return function render(state, settings) {
     const colors = getColorTheme(settings?.color).colors;
+    const map = getMapDefinition(state.map?.id);
+    const metrics = getBoardMetrics(map);
 
     context.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    drawBoard(context, colors);
-    drawApple(context, state.apple, colors);
-    drawSnake(context, state.snake, colors);
+    drawBoard(context, map, metrics, colors);
+    drawObstacles(context, map.obstacles, metrics);
+    drawApple(context, state.apple, metrics, colors);
+    drawSnake(context, state.snake, metrics, colors);
     drawStatus(context, state.status, colors);
   };
 }
 
-function drawBoard(context, colors) {
-  context.fillStyle = colors.board;
+function drawBoard(context, map, metrics, colors) {
+  context.fillStyle = MAP_COLORS.outside;
   context.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+  context.fillStyle = colors.board;
+  context.fillRect(metrics.offsetX, metrics.offsetY, metrics.width, metrics.height);
   context.strokeStyle = colors.grid;
   context.lineWidth = 1;
 
-  const cellSize = CANVAS_SIZE / GRID_SIZE;
-
-  for (let index = 1; index < GRID_SIZE; index += 1) {
-    const position = Math.round(index * cellSize) + 0.5;
+  for (let index = 1; index < map.width; index += 1) {
+    const position = Math.round(metrics.offsetX + index * metrics.cellSize) + 0.5;
 
     context.beginPath();
-    context.moveTo(position, 0);
-    context.lineTo(position, CANVAS_SIZE);
+    context.moveTo(position, metrics.offsetY);
+    context.lineTo(position, metrics.offsetY + metrics.height);
     context.stroke();
+  }
+
+  for (let index = 1; index < map.height; index += 1) {
+    const position = Math.round(metrics.offsetY + index * metrics.cellSize) + 0.5;
 
     context.beginPath();
-    context.moveTo(0, position);
-    context.lineTo(CANVAS_SIZE, position);
+    context.moveTo(metrics.offsetX, position);
+    context.lineTo(metrics.offsetX + metrics.width, position);
     context.stroke();
   }
 }
 
-function drawSnake(context, snake, colors) {
+function drawObstacles(context, obstacles, metrics) {
+  obstacles.forEach((cell) => {
+    drawRoundedCell(context, cell, MAP_COLORS.wall, 4, metrics, true);
+  });
+}
+
+function drawSnake(context, snake, metrics, colors) {
   snake.forEach((cell, index) => {
     const isHead = index === 0;
-    drawRoundedCell(context, cell, isHead ? colors.snakeHead : colors.snakeBody, isHead ? 4 : 5);
+    drawRoundedCell(context, cell, isHead ? colors.snakeHead : colors.snakeBody, isHead ? 4 : 5, metrics);
 
     if (isHead) {
-      drawRoundedCell(context, cell, colors.snakeShadow, 11);
+      drawRoundedCell(context, cell, colors.snakeShadow, 11, metrics);
     }
   });
 }
 
-function drawApple(context, apple, colors) {
+function drawApple(context, apple, metrics, colors) {
   if (!apple) {
     return;
   }
 
-  const cellSize = CANVAS_SIZE / GRID_SIZE;
-  const centerX = apple.x * cellSize + cellSize / 2;
-  const centerY = apple.y * cellSize + cellSize / 2;
+  const centerX = metrics.offsetX + apple.x * metrics.cellSize + metrics.cellSize / 2;
+  const centerY = metrics.offsetY + apple.y * metrics.cellSize + metrics.cellSize / 2;
 
   context.fillStyle = colors.apple;
   context.beginPath();
-  context.arc(centerX, centerY, cellSize * 0.33, 0, Math.PI * 2);
+  context.arc(centerX, centerY, metrics.cellSize * 0.33, 0, Math.PI * 2);
   context.fill();
 
   context.fillStyle = colors.appleCore;
   context.beginPath();
-  context.arc(centerX + cellSize * 0.12, centerY - cellSize * 0.12, cellSize * 0.08, 0, Math.PI * 2);
+  context.arc(
+    centerX + metrics.cellSize * 0.12,
+    centerY - metrics.cellSize * 0.12,
+    metrics.cellSize * 0.08,
+    0,
+    Math.PI * 2
+  );
   context.fill();
 }
 
-function drawRoundedCell(context, cell, color, inset) {
-  const cellSize = CANVAS_SIZE / GRID_SIZE;
-  const x = cell.x * cellSize + inset;
-  const y = cell.y * cellSize + inset;
-  const size = cellSize - inset * 2;
+function drawRoundedCell(context, cell, color, inset, metrics, withStroke = false) {
+  const x = metrics.offsetX + cell.x * metrics.cellSize + inset;
+  const y = metrics.offsetY + cell.y * metrics.cellSize + inset;
+  const size = metrics.cellSize - inset * 2;
   const radius = Math.max(3, size * 0.22);
 
   context.fillStyle = color;
   context.beginPath();
   context.roundRect(x, y, size, size, radius);
   context.fill();
+
+  if (withStroke) {
+    context.strokeStyle = MAP_COLORS.cellStroke;
+    context.lineWidth = 2;
+    context.stroke();
+  }
+}
+
+function getBoardMetrics(map) {
+  const cellSize = Math.floor(Math.min(CANVAS_SIZE / map.width, CANVAS_SIZE / map.height));
+  const width = cellSize * map.width;
+  const height = cellSize * map.height;
+
+  return {
+    cellSize,
+    width,
+    height,
+    offsetX: (CANVAS_SIZE - width) / 2,
+    offsetY: (CANVAS_SIZE - height) / 2
+  };
 }
 
 function drawStatus(context, status, colors) {

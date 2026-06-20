@@ -1,6 +1,9 @@
+import { DEFAULT_MAP_ID, MAPS, getMapDefinition } from "./maps.js";
+
 export const DEFAULT_GAME_SETTINGS = Object.freeze({
   speed: "normal",
-  color: "classic"
+  color: "classic",
+  map: DEFAULT_MAP_ID
 });
 
 export const SPEED_OPTIONS = Object.freeze([
@@ -74,10 +77,21 @@ export const COLOR_THEMES = Object.freeze([
   })
 ]);
 
+export const MAP_OPTIONS = Object.freeze(
+  MAPS.map((map) =>
+    Object.freeze({
+      id: map.id,
+      label: map.label,
+      summary: map.summary
+    })
+  )
+);
+
 export function normalizeSettings(settings = {}) {
   return {
     speed: getSpeedOption(settings.speed).id,
-    color: getColorTheme(settings.color).id
+    color: getColorTheme(settings.color).id,
+    map: getMapOption(settings.map).id
   };
 }
 
@@ -87,4 +101,10 @@ export function getSpeedOption(speedId) {
 
 export function getColorTheme(colorId) {
   return COLOR_THEMES.find((theme) => theme.id === colorId) ?? COLOR_THEMES[0];
+}
+
+export function getMapOption(mapId) {
+  const map = getMapDefinition(mapId);
+
+  return MAP_OPTIONS.find((option) => option.id === map.id) ?? MAP_OPTIONS[0];
 }

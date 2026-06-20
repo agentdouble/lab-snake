@@ -6,3 +6,4 @@
 - Les tests utilisent le runner Node integre via `npm test`, avec les scenarios de base dans `tests/engine.test.js`.
 - Le depot GitHub cible est `https://github.com/agentdouble/lab-snake`; la branche de publication est `main`.
 - Le menu `Reglages` expose les vitesses `Lente`, `Normale`, `Rapide` et `Expert`; ce choix est sauvegarde par `storage.js` et applique au delai moteur via le multiplicateur de `settings.js`.
+- Les types de map Snake sont definis dans `src/maps.js`; le choix de map est un champ de `src/settings.js`, persiste dans `snake.settings`, et une nouvelle partie applique la map selectionnee.
