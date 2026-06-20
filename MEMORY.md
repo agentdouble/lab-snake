@@ -2,7 +2,8 @@
 
 - Le projet est un Snake web statique sans dependance runtime. L'entree est `index.html`, le code applicatif est dans `src/`, et `npm start` lance `python3 -m http.server 4173`.
 - La logique de jeu testable vit dans `src/engine.js`; le rendu canvas, les entrees clavier/tactile, le stockage local et le bootstrap sont separes dans `renderer.js`, `input.js`, `storage.js` et `main.js`.
+- Les reglages de jeu disponibles dans l'UI sont centralises dans `src/settings.js`; le moteur accepte un multiplicateur de vitesse optionnel et le renderer applique les themes de couleur via ce module.
 - Les tests utilisent le runner Node integre via `npm test`, avec les scenarios de base dans `tests/engine.test.js`.
 - Le depot GitHub cible est `https://github.com/agentdouble/lab-snake`; la branche de publication est `main`.
-- Les profils de vitesse du serpent sont definis dans `src/constants.js`, appliques par `getTickDelay(score, speedKey)` dans `src/engine.js`, et conserves par `resetGame` entre deux parties.
-- Le mode rapide est un mode de partie explicite (`modeKey: "quick"`) qui verrouille la vitesse sur le profil `fast`; choisir une vitesse manuelle repasse le mode en `standard` pour eviter les conflits de reglage.
+- Le menu `Reglages` expose les vitesses `Lente`, `Normale`, `Rapide` et `Expert`; ce choix est sauvegarde par `storage.js` et applique au delai moteur via le multiplicateur de `settings.js`.
+- Le mode rapide est un reglage `mode: "quick"` centralise dans `src/settings.js`; il verrouille la vitesse effective sur `fast` via `getEffectiveSpeedOption`, tandis que le mode standard conserve la vitesse manuelle sauvegardee.

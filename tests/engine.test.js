@@ -1,19 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { DIRECTIONS, QUICK_MODE_SPEED_KEY, STATUS } from "../src/constants.js";
-import {
-  createInitialState,
-  getGameMode,
-  getTickDelay,
-  isSpeedLockedByMode,
-  queueDirection,
-  resetGame,
-  setGameMode,
-  setSpeedLevel,
-  startGame,
-  stepState
-} from "../src/engine.js";
+import { DIRECTIONS, STATUS } from "../src/constants.js";
+import { createInitialState, getTickDelay, queueDirection, startGame, stepState } from "../src/engine.js";
 
 test("the snake grows and scores when it eats an apple", () => {
   const state = startGame(
@@ -60,58 +49,38 @@ test("wall collision ends the game", () => {
   assert.equal(nextState.bestScore, 0);
 });
 
+test("self collision ends the game", () => {
+  const state = startGame(
+    createInitialState({
+      snake: [
+        { x: 5, y: 5 },
+        { x: 5, y: 6 },
+        { x: 4, y: 6 },
+        { x: 4, y: 5 },
+        { x: 4, y: 4 }
+      ],
+      apple: { x: 0, y: 0 },
+      direction: DIRECTIONS.DOWN
+    })
+  );
+
+  const nextState = stepState(state);
+
+  assert.equal(nextState.status, STATUS.GAME_OVER);
+  assert.equal(nextState.ticks, 1);
+  assert.deepEqual(nextState.snake, state.snake);
+});
+
 test("the game accelerates without passing the minimum delay", () => {
   assert.equal(getTickDelay(0), 145);
   assert.equal(getTickDelay(10), 95);
   assert.equal(getTickDelay(1000), 62);
 });
 
-test("a faster speed level shortens the movement delay", () => {
-  assert.equal(getTickDelay(0, "fast"), 112);
-  assert.equal(getTickDelay(0, "turbo"), 91);
-  assert.ok(getTickDelay(5, "turbo") < getTickDelay(5, "normal"));
-  assert.equal(getTickDelay(1000, "turbo"), 62);
-});
-
-test("restart preserves the selected speed level", () => {
-  let state = createInitialState();
-
-  state = setSpeedLevel(state, "turbo");
-  const restartedState = resetGame(state);
-
-  assert.equal(restartedState.speedKey, "turbo");
-  assert.equal(restartedState.score, 0);
-  assert.equal(restartedState.status, STATUS.READY);
-});
-
-test("quick mode configures a faster game without manual speed changes", () => {
-  let state = createInitialState();
-
-  state = setGameMode(state, "quick");
-
-  assert.equal(state.modeKey, "quick");
-  assert.equal(getGameMode(state.modeKey).label, "Mode rapide");
-  assert.equal(state.speedKey, QUICK_MODE_SPEED_KEY);
-  assert.ok(isSpeedLockedByMode(state.modeKey));
-  assert.ok(getTickDelay(0, state.speedKey) < getTickDelay(0, "normal"));
-});
-
-test("manual speed selection leaves quick mode to avoid conflicting settings", () => {
-  let state = createInitialState({ modeKey: "quick" });
-
-  state = setSpeedLevel(state, "turbo");
-
-  assert.equal(state.modeKey, "standard");
-  assert.equal(state.speedKey, "turbo");
-  assert.equal(isSpeedLockedByMode(state.modeKey), false);
-});
-
-test("restart preserves quick mode and its locked speed", () => {
-  const state = setGameMode(createInitialState(), "quick");
-  const restartedState = resetGame(state);
-
-  assert.equal(restartedState.modeKey, "quick");
-  assert.equal(restartedState.speedKey, QUICK_MODE_SPEED_KEY);
-  assert.equal(restartedState.score, 0);
-  assert.equal(restartedState.status, STATUS.READY);
+test("the game speed multiplier changes tick delay without dropping below the minimum", () => {
+  assert.equal(getTickDelay(0, 1.25), 116);
+  assert.equal(getTickDelay(0, 1.5), 97);
+  assert.equal(getTickDelay(10, 0.8), 119);
+  assert.equal(getTickDelay(1000, 1.5), 62);
+  assert.equal(getTickDelay(0, 0), 145);
 });

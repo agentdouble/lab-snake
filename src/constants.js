@@ -4,22 +4,6 @@ export const START_DELAY_MS = 145;
 export const MIN_DELAY_MS = 62;
 export const DELAY_STEP_MS = 5;
 
-export const SPEED_LEVELS = Object.freeze([
-  Object.freeze({ key: "normal", label: "Normal", multiplier: 1 }),
-  Object.freeze({ key: "fast", label: "Rapide", multiplier: 1.3 }),
-  Object.freeze({ key: "turbo", label: "Turbo", multiplier: 1.6 })
-]);
-
-export const DEFAULT_SPEED_KEY = SPEED_LEVELS[0].key;
-export const QUICK_MODE_SPEED_KEY = "fast";
-
-export const GAME_MODES = Object.freeze([
-  Object.freeze({ key: "standard", label: "Standard", speedKey: null }),
-  Object.freeze({ key: "quick", label: "Mode rapide", speedKey: QUICK_MODE_SPEED_KEY })
-]);
-
-export const DEFAULT_MODE_KEY = GAME_MODES[0].key;
-
 export const STATUS = Object.freeze({
   READY: "ready",
   RUNNING: "running",

@@ -1,22 +1,26 @@
-import { DIRECTIONS, STATUS } from "./constants.js";
+import { DIRECTIONS, START_DELAY_MS, STATUS } from "./constants.js";
 import {
   createInitialState,
-  getGameMode,
-  getSpeedLevel,
-  getSpeedMultiplier,
   getTickDelay,
-  isSpeedLockedByMode,
   pauseGame,
   queueDirection,
   resetGame,
-  setGameMode,
-  setSpeedLevel,
   startGame,
   stepState
 } from "./engine.js";
 import { bindKeyboard, bindTouch } from "./input.js";
 import { createRenderer } from "./renderer.js";
-import { loadBestScore, saveBestScore } from "./storage.js";
+import {
+  COLOR_THEMES,
+  DEFAULT_GAME_SETTINGS,
+  GAME_MODES,
+  SPEED_OPTIONS,
+  getEffectiveSpeedOption,
+  getGameMode,
+  isSpeedLockedByMode,
+  normalizeSettings
+} from "./settings.js";
+import { loadBestScore, loadSettings, saveBestScore, saveSettings } from "./storage.js";
 
 const canvas = document.querySelector("#game-canvas");
 const scoreValue = document.querySelector("#score-value");
@@ -27,13 +31,20 @@ const statusLabel = document.querySelector("#status-label");
 const playButton = document.querySelector("#play-button");
 const pauseButton = document.querySelector("#pause-button");
 const restartButton = document.querySelector("#restart-button");
-const modeButtons = [...document.querySelectorAll("[data-mode-key]")];
-const speedStripLabel = document.querySelector("#speed-strip-label");
-const speedButtons = [...document.querySelectorAll("[data-speed-key]")];
+const settingsButton = document.querySelector("#settings-button");
+const settingsDialog = document.querySelector("#settings-dialog");
+const settingsForm = document.querySelector("#settings-form");
+const modeSetting = document.querySelector("#mode-setting");
+const speedSetting = document.querySelector("#speed-setting");
+const speedSettingLabel = document.querySelector("#speed-setting-label");
+const colorSetting = document.querySelector("#color-setting");
+const settingsResetButton = document.querySelector("#settings-reset-button");
 const render = createRenderer(canvas);
 
 let state = createInitialState({ bestScore: loadBestScore() });
+let settings = loadSettings();
 let loopTimer = null;
+let resumeAfterSettings = false;
 
 function setState(nextState, options = {}) {
   state = nextState;
@@ -42,7 +53,7 @@ function setState(nextState, options = {}) {
     saveBestScore(state.bestScore);
   }
 
-  render(state);
+  render(state, settings);
   updateHud();
 }
 
@@ -65,7 +76,7 @@ function scheduleTick() {
     return;
   }
 
-  loopTimer = window.setTimeout(runTick, getTickDelay(state.score, state.speedKey));
+  loopTimer = window.setTimeout(runTick, getTickDelay(state.score, currentSpeedOption().multiplier));
 }
 
 function clearTick() {
@@ -94,25 +105,11 @@ function restart() {
   canvas.focus();
 }
 
-function chooseSpeed(speedKey) {
-  if (state.status === STATUS.RUNNING || isSpeedLockedByMode(state.modeKey)) {
-    return;
-  }
-
-  setState(setSpeedLevel(state, speedKey));
-  canvas.focus();
-}
-
-function chooseMode(modeKey) {
-  if (state.status === STATUS.RUNNING) {
-    return;
-  }
-
-  setState(setGameMode(state, modeKey));
-  canvas.focus();
-}
-
 function handleDirection(direction) {
+  if (isSettingsOpen()) {
+    return;
+  }
+
   if (state.status === STATUS.READY || state.status === STATUS.PAUSED) {
     state = startGame(state);
   }
@@ -122,34 +119,120 @@ function handleDirection(direction) {
 }
 
 function updateHud() {
-  const gameMode = getGameMode(state.modeKey);
-  const speedLevel = getSpeedLevel(state.speedKey);
-  const isSpeedLocked = isSpeedLockedByMode(state.modeKey);
+  const speedOption = currentSpeedOption();
+  const mode = getGameMode(settings.mode);
 
   scoreValue.textContent = String(state.score);
   bestValue.textContent = String(state.bestScore);
-  modeValue.textContent = gameMode.label;
-  speedValue.textContent = `${speedLevel.label} ${getSpeedMultiplier(state.score, state.speedKey).toFixed(1)}x`;
-  speedStripLabel.textContent = isSpeedLocked ? "Vitesse du mode" : "Vitesse manuelle";
-  statusLabel.textContent = statusText(state.status);
+  modeValue.textContent = mode.label;
+  speedValue.textContent = `${speedOption.label} ${(START_DELAY_MS / getTickDelay(state.score, speedOption.multiplier)).toFixed(1)}x`;
+  statusLabel.textContent = isSettingsOpen() ? "Reglages" : statusText(state.status);
   playButton.disabled = state.status === STATUS.RUNNING || state.status === STATUS.GAME_OVER || state.status === STATUS.WON;
   pauseButton.disabled = state.status !== STATUS.RUNNING;
+}
 
-  modeButtons.forEach((button) => {
-    const isSelected = button.dataset.modeKey === state.modeKey;
+function currentSpeedOption() {
+  return getEffectiveSpeedOption(settings);
+}
 
-    button.disabled = state.status === STATUS.RUNNING;
-    button.setAttribute("aria-pressed", String(isSelected));
-    button.classList.toggle("selected", isSelected);
+function populateSettingsControls() {
+  modeSetting.replaceChildren(...GAME_MODES.map(createOptionElement));
+  speedSetting.replaceChildren(...SPEED_OPTIONS.map(createOptionElement));
+  colorSetting.replaceChildren(...COLOR_THEMES.map(createOptionElement));
+  syncSettingsControls();
+}
+
+function createOptionElement(option) {
+  const element = document.createElement("option");
+
+  element.value = option.id;
+  element.textContent = option.label;
+
+  return element;
+}
+
+function syncSettingsControls() {
+  const speedLocked = isSpeedLockedByMode(settings.mode);
+
+  modeSetting.value = settings.mode;
+  speedSetting.value = currentSpeedOption().id;
+  speedSetting.disabled = speedLocked;
+  speedSettingLabel.textContent = speedLocked ? "Vitesse du mode" : "Vitesse";
+  colorSetting.value = settings.color;
+}
+
+function setSettings(nextSettings) {
+  settings = normalizeSettings(nextSettings);
+  saveSettings(settings);
+  syncSettingsControls();
+  render(state, settings);
+  updateHud();
+
+  if (state.status === STATUS.RUNNING && !isSettingsOpen()) {
+    clearTick();
+    scheduleTick();
+  }
+}
+
+function handleSettingsChange(event) {
+  setSettings({
+    mode: modeSetting.value,
+    speed: event.target === speedSetting ? speedSetting.value : settings.speed,
+    color: colorSetting.value
   });
+}
 
-  speedButtons.forEach((button) => {
-    const isSelected = button.dataset.speedKey === state.speedKey;
+function openSettings() {
+  if (isSettingsOpen()) {
+    return;
+  }
 
-    button.disabled = state.status === STATUS.RUNNING || isSpeedLocked;
-    button.setAttribute("aria-pressed", String(isSelected));
-    button.classList.toggle("selected", isSelected);
-  });
+  resumeAfterSettings = state.status === STATUS.RUNNING;
+  clearTick();
+  syncSettingsControls();
+  showSettingsDialog();
+  updateHud();
+  modeSetting.focus();
+}
+
+function showSettingsDialog() {
+  if (typeof settingsDialog.showModal === "function") {
+    settingsDialog.showModal();
+    return;
+  }
+
+  settingsDialog.setAttribute("open", "");
+}
+
+function closeSettingsDialog() {
+  if (!isSettingsOpen()) {
+    return;
+  }
+
+  if (typeof settingsDialog.close === "function") {
+    settingsDialog.close();
+    return;
+  }
+
+  settingsDialog.removeAttribute("open");
+  handleSettingsClosed();
+}
+
+function isSettingsOpen() {
+  return settingsDialog.open || settingsDialog.hasAttribute("open");
+}
+
+function handleSettingsClosed() {
+  const shouldResume = resumeAfterSettings && state.status === STATUS.RUNNING;
+
+  resumeAfterSettings = false;
+  updateHud();
+
+  if (shouldResume) {
+    scheduleTick();
+  }
+
+  settingsButton.focus();
 }
 
 function statusText(status) {
@@ -171,16 +254,29 @@ function statusText(status) {
 playButton.addEventListener("click", play);
 pauseButton.addEventListener("click", pause);
 restartButton.addEventListener("click", restart);
-
-modeButtons.forEach((button) => {
-  button.addEventListener("click", () => chooseMode(button.dataset.modeKey));
+settingsButton.addEventListener("click", openSettings);
+settingsForm.addEventListener("submit", (event) => {
+  if (typeof settingsDialog.close !== "function") {
+    event.preventDefault();
+    closeSettingsDialog();
+  }
+});
+modeSetting.addEventListener("change", handleSettingsChange);
+speedSetting.addEventListener("change", handleSettingsChange);
+colorSetting.addEventListener("change", handleSettingsChange);
+settingsResetButton.addEventListener("click", () => setSettings(DEFAULT_GAME_SETTINGS));
+settingsDialog.addEventListener("close", handleSettingsClosed);
+settingsDialog.addEventListener("click", (event) => {
+  if (event.target === settingsDialog) {
+    closeSettingsDialog();
+  }
 });
 
-speedButtons.forEach((button) => {
-  button.addEventListener("click", () => chooseSpeed(button.dataset.speedKey));
-});
+populateSettingsControls();
 
-bindKeyboard(handleDirection);
+bindKeyboard(handleDirection, {
+  shouldIgnore: isSettingsOpen
+});
 bindTouch(canvas, handleDirection);
 
 window.addEventListener("blur", () => {
@@ -189,6 +285,6 @@ window.addEventListener("blur", () => {
   }
 });
 
-window.addEventListener("resize", () => render(state));
+window.addEventListener("resize", () => render(state, settings));
 
 setState(queueDirection(state, DIRECTIONS.RIGHT));

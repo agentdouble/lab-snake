@@ -1,18 +1,11 @@
 import {
   DELAY_STEP_MS,
-  DEFAULT_MODE_KEY,
-  DEFAULT_SPEED_KEY,
   DIRECTIONS,
-  GAME_MODES,
   GRID_SIZE,
   MIN_DELAY_MS,
-  SPEED_LEVELS,
   START_DELAY_MS,
   STATUS
 } from "./constants.js";
-
-const SPEED_LEVEL_BY_KEY = Object.freeze(Object.fromEntries(SPEED_LEVELS.map((level) => [level.key, level])));
-const GAME_MODE_BY_KEY = Object.freeze(Object.fromEntries(GAME_MODES.map((mode) => [mode.key, mode])));
 
 const DEFAULT_SNAKE = Object.freeze([
   Object.freeze({ x: 9, y: 10 }),
@@ -26,14 +19,10 @@ export function createInitialState(options = {}) {
     randomizer = Math.random,
     snake = DEFAULT_SNAKE,
     direction = DIRECTIONS.RIGHT,
-    apple,
-    modeKey = DEFAULT_MODE_KEY,
-    speedKey = DEFAULT_SPEED_KEY
+    apple
   } = options;
 
   const initialSnake = snake.map(copyCell);
-  const gameMode = getGameMode(modeKey);
-  const speedLevel = getSpeedLevel(gameMode.speedKey ?? speedKey);
 
   return {
     snake: initialSnake,
@@ -43,8 +32,6 @@ export function createInitialState(options = {}) {
     score: 0,
     bestScore,
     status: STATUS.READY,
-    modeKey: gameMode.key,
-    speedKey: speedLevel.key,
     ticks: 0
   };
 }
@@ -68,39 +55,8 @@ export function pauseGame(state) {
 export function resetGame(state, options = {}) {
   return createInitialState({
     bestScore: state.bestScore,
-    modeKey: state.modeKey,
-    speedKey: state.speedKey,
     ...options
   });
-}
-
-export function setGameMode(state, modeKey) {
-  const gameMode = getGameMode(modeKey);
-  const speedLevel = getSpeedLevel(gameMode.speedKey ?? state.speedKey);
-
-  if (state.modeKey === gameMode.key && state.speedKey === speedLevel.key) {
-    return state;
-  }
-
-  return {
-    ...state,
-    modeKey: gameMode.key,
-    speedKey: speedLevel.key
-  };
-}
-
-export function setSpeedLevel(state, speedKey) {
-  const speedLevel = getSpeedLevel(speedKey);
-
-  if (state.modeKey === DEFAULT_MODE_KEY && state.speedKey === speedLevel.key) {
-    return state;
-  }
-
-  return {
-    ...state,
-    modeKey: DEFAULT_MODE_KEY,
-    speedKey: speedLevel.key
-  };
 }
 
 export function queueDirection(state, direction) {
@@ -169,27 +125,11 @@ export function stepState(state, randomizer = Math.random) {
   };
 }
 
-export function getTickDelay(score, speedKey = DEFAULT_SPEED_KEY) {
-  const baseDelay = Math.max(MIN_DELAY_MS, START_DELAY_MS - score * DELAY_STEP_MS);
-  const speedLevel = getSpeedLevel(speedKey);
+export function getTickDelay(score, speedMultiplier = 1) {
+  const normalizedMultiplier = Number.isFinite(speedMultiplier) && speedMultiplier > 0 ? speedMultiplier : 1;
+  const scaledDelay = Math.round((START_DELAY_MS - score * DELAY_STEP_MS) / normalizedMultiplier);
 
-  return Math.max(MIN_DELAY_MS, Math.round(baseDelay / speedLevel.multiplier));
-}
-
-export function getSpeedLevel(speedKey) {
-  return SPEED_LEVEL_BY_KEY[speedKey] ?? SPEED_LEVEL_BY_KEY[DEFAULT_SPEED_KEY];
-}
-
-export function getGameMode(modeKey) {
-  return GAME_MODE_BY_KEY[modeKey] ?? GAME_MODE_BY_KEY[DEFAULT_MODE_KEY];
-}
-
-export function isSpeedLockedByMode(modeKey) {
-  return Boolean(getGameMode(modeKey).speedKey);
-}
-
-export function getSpeedMultiplier(score, speedKey = DEFAULT_SPEED_KEY) {
-  return START_DELAY_MS / getTickDelay(score, speedKey);
+  return Math.max(MIN_DELAY_MS, scaledDelay);
 }
 
 export function randomFreeCell(occupiedCells, randomizer = Math.random) {
@@ -226,6 +166,10 @@ function addCells(cell, direction) {
   };
 }
 
+function copyCell(cell) {
+  return { x: cell.x, y: cell.y };
+}
+
 function isOutsideGrid(cell) {
   return cell.x < 0 || cell.y < 0 || cell.x >= GRID_SIZE || cell.y >= GRID_SIZE;
 }
@@ -248,8 +192,4 @@ function isOpposite(first, second) {
 
 function cellKey(cell) {
   return `${cell.x}:${cell.y}`;
-}
-
-function copyCell(cell) {
-  return { x: cell.x, y: cell.y };
 }
