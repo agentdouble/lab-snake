@@ -1,16 +1,17 @@
-import { DIRECTIONS, START_DELAY_MS, STATUS } from "./constants.js";
+import { START_DELAY_MS, STATUS } from "./constants.js";
 import {
   createInitialState,
   getTickDelay,
   pauseGame,
   queueDirection,
   resetGame,
+  restoreState,
   startGame,
   stepState
 } from "./engine.js";
 import { bindKeyboard, bindTouch } from "./input.js";
 import { createRenderer } from "./renderer.js";
-import { loadBestScore, saveBestScore } from "./storage.js";
+import { clearSavedGame, loadBestScore, loadSavedGame, saveBestScore, saveGameState } from "./storage.js";
 
 const canvas = document.querySelector("#game-canvas");
 const scoreValue = document.querySelector("#score-value");
@@ -22,7 +23,10 @@ const pauseButton = document.querySelector("#pause-button");
 const restartButton = document.querySelector("#restart-button");
 const render = createRenderer(canvas);
 
-let state = createInitialState({ bestScore: loadBestScore() });
+const bestScore = loadBestScore();
+const savedGame = loadSavedGame();
+
+let state = savedGame ? restoreState(savedGame, { bestScore }) : createInitialState({ bestScore });
 let loopTimer = null;
 
 function setState(nextState, options = {}) {
@@ -32,6 +36,7 @@ function setState(nextState, options = {}) {
     saveBestScore(state.bestScore);
   }
 
+  syncSavedGame(options);
   render(state);
   updateHud();
 }
@@ -80,7 +85,7 @@ function pause() {
 
 function restart() {
   clearTick();
-  setState(resetGame(state));
+  setState(resetGame(state), { clearSavedGame: true });
   canvas.focus();
 }
 
@@ -118,6 +123,17 @@ function statusText(status) {
   }
 }
 
+function syncSavedGame(options = {}) {
+  if (options.clearSavedGame || state.status === STATUS.GAME_OVER || state.status === STATUS.WON) {
+    clearSavedGame();
+    return;
+  }
+
+  if (state.status === STATUS.RUNNING || state.status === STATUS.PAUSED) {
+    saveGameState(state);
+  }
+}
+
 playButton.addEventListener("click", play);
 pauseButton.addEventListener("click", pause);
 restartButton.addEventListener("click", restart);
@@ -133,4 +149,5 @@ window.addEventListener("blur", () => {
 
 window.addEventListener("resize", () => render(state));
 
-setState(queueDirection(state, DIRECTIONS.RIGHT));
+setState(state);
+scheduleTick();

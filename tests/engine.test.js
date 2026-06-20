@@ -6,6 +6,7 @@ import {
   createInitialState,
   getTickDelay,
   queueDirection,
+  restoreState,
   startGame,
   stepState
 } from "../src/engine.js";
@@ -59,4 +60,33 @@ test("the game accelerates without passing the minimum delay", () => {
   assert.equal(getTickDelay(0), 145);
   assert.equal(getTickDelay(10), 95);
   assert.equal(getTickDelay(1000), 62);
+});
+
+test("a saved state can be restored without losing the existing best score", () => {
+  const state = restoreState(
+    {
+      snake: [
+        { x: 10, y: 10 },
+        { x: 9, y: 10 },
+        { x: 8, y: 10 },
+        { x: 7, y: 10 }
+      ],
+      direction: "right",
+      directionQueue: ["down"],
+      apple: { x: 12, y: 12 },
+      score: 1,
+      bestScore: 4,
+      status: STATUS.PAUSED,
+      ticks: 9
+    },
+    { bestScore: 8 }
+  );
+
+  assert.deepEqual(state.snake[0], { x: 10, y: 10 });
+  assert.equal(state.direction, DIRECTIONS.RIGHT);
+  assert.deepEqual(state.directionQueue, [DIRECTIONS.DOWN]);
+  assert.equal(state.score, 1);
+  assert.equal(state.bestScore, 8);
+  assert.equal(state.status, STATUS.PAUSED);
+  assert.equal(state.ticks, 9);
 });
