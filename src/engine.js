@@ -1,35 +1,35 @@
 import {
   DELAY_STEP_MS,
   DIRECTIONS,
-  GRID_SIZE,
   MIN_DELAY_MS,
   START_DELAY_MS,
   STATUS
 } from "./constants.js";
-
-const DEFAULT_SNAKE = Object.freeze([
-  Object.freeze({ x: 9, y: 10 }),
-  Object.freeze({ x: 8, y: 10 }),
-  Object.freeze({ x: 7, y: 10 })
-]);
+import { getMapDefinition } from "./maps.js";
 
 export function createInitialState(options = {}) {
   const {
     bestScore = 0,
     randomizer,
-    snake = DEFAULT_SNAKE,
-    direction = DIRECTIONS.RIGHT,
     apple
   } = options;
 
+  const map = getMapDefinition(options.mapId ?? options.map?.id);
+  const snake = options.snake ?? map.startSnake;
+  const direction = options.direction ?? map.startDirection ?? DIRECTIONS.RIGHT;
   const initialSnake = snake.map(copyCell);
   const initialRandomizer = randomizer ?? Math.random;
+  const initialApple =
+    apple && isFreeCell(apple, initialSnake, map)
+      ? copyCell(apple)
+      : randomFreeCell(initialSnake, initialRandomizer, map);
 
   return {
+    map,
     snake: initialSnake,
     direction,
     directionQueue: [],
-    apple: apple ? copyCell(apple) : randomFreeCell(initialSnake, initialRandomizer),
+    apple: initialApple,
     score: 0,
     bestScore,
     status: STATUS.READY,
@@ -54,9 +54,18 @@ export function pauseGame(state) {
   return { ...state, status: STATUS.PAUSED };
 }
 
+export function resumeGame(state) {
+  if (state.status !== STATUS.PAUSED) {
+    return state;
+  }
+
+  return { ...state, status: STATUS.RUNNING };
+}
+
 export function resetGame(state, options = {}) {
   return createInitialState({
     bestScore: state.bestScore,
+    mapId: state.map.id,
     ...options
   });
 }
@@ -93,7 +102,7 @@ export function stepState(state, randomizer = state.randomizer ?? Math.random) {
   const grows = state.apple && sameCell(nextHead, state.apple);
   const collisionBody = grows ? state.snake : state.snake.slice(0, -1);
 
-  if (isOutsideGrid(nextHead) || containsCell(collisionBody, nextHead)) {
+  if (!isValidMapCell(nextHead, state.map) || containsCell(collisionBody, nextHead)) {
     return {
       ...state,
       direction,
@@ -110,7 +119,7 @@ export function stepState(state, randomizer = state.randomizer ?? Math.random) {
     nextSnake.pop();
   }
 
-  const nextApple = grows ? randomFreeCell(nextSnake, randomizer) : state.apple;
+  const nextApple = grows ? randomFreeCell(nextSnake, randomizer, state.map) : state.apple;
   const nextScore = grows ? state.score + 1 : state.score;
   const hasWon = grows && !nextApple;
 
@@ -127,13 +136,24 @@ export function stepState(state, randomizer = state.randomizer ?? Math.random) {
   };
 }
 
-export function getTickDelay(score) {
-  return Math.max(MIN_DELAY_MS, START_DELAY_MS - score * DELAY_STEP_MS);
+export function getTickDelay(score, speedMultiplier = 1) {
+  const normalizedMultiplier = Number.isFinite(speedMultiplier) && speedMultiplier > 0 ? speedMultiplier : 1;
+  const scaledDelay = Math.round((START_DELAY_MS - score * DELAY_STEP_MS) / normalizedMultiplier);
+
+  return Math.max(MIN_DELAY_MS, scaledDelay);
 }
 
-export function randomFreeCell(occupiedCells, randomizer = Math.random) {
-  const occupied = new Set(occupiedCells.map(cellKey));
-  const freeCellsCount = GRID_SIZE * GRID_SIZE - occupied.size;
+export function randomFreeCell(occupiedCells, randomizer = Math.random, mapDefinition) {
+  const map = getMapDefinition(mapDefinition?.id ?? mapDefinition);
+  const occupied = new Set(map.obstacles.map(cellKey));
+
+  occupiedCells.forEach((cell) => {
+    if (isInsideMap(cell, map)) {
+      occupied.add(cellKey(cell));
+    }
+  });
+
+  const freeCellsCount = map.width * map.height - occupied.size;
 
   if (freeCellsCount <= 0) {
     return null;
@@ -141,8 +161,8 @@ export function randomFreeCell(occupiedCells, randomizer = Math.random) {
 
   let targetIndex = Math.floor(randomizer() * freeCellsCount);
 
-  for (let y = 0; y < GRID_SIZE; y += 1) {
-    for (let x = 0; x < GRID_SIZE; x += 1) {
+  for (let y = 0; y < map.height; y += 1) {
+    for (let x = 0; x < map.width; x += 1) {
       if (occupied.has(cellKey({ x, y }))) {
         continue;
       }
@@ -158,6 +178,12 @@ export function randomFreeCell(occupiedCells, randomizer = Math.random) {
   return null;
 }
 
+export function isValidMapCell(cell, mapDefinition) {
+  const map = getMapDefinition(mapDefinition?.id ?? mapDefinition);
+
+  return isInsideMap(cell, map) && !containsCell(map.obstacles, cell);
+}
+
 function addCells(cell, direction) {
   return {
     x: cell.x + direction.x,
@@ -165,8 +191,16 @@ function addCells(cell, direction) {
   };
 }
 
-function isOutsideGrid(cell) {
-  return cell.x < 0 || cell.y < 0 || cell.x >= GRID_SIZE || cell.y >= GRID_SIZE;
+function copyCell(cell) {
+  return { x: cell.x, y: cell.y };
+}
+
+function isFreeCell(cell, occupiedCells, map) {
+  return isValidMapCell(cell, map) && !containsCell(occupiedCells, cell);
+}
+
+function isInsideMap(cell, map) {
+  return cell.x >= 0 && cell.y >= 0 && cell.x < map.width && cell.y < map.height;
 }
 
 function containsCell(cells, target) {
@@ -187,8 +221,4 @@ function isOpposite(first, second) {
 
 function cellKey(cell) {
   return `${cell.x}:${cell.y}`;
-}
-
-function copyCell(cell) {
-  return { x: cell.x, y: cell.y };
 }

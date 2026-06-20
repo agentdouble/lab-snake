@@ -4,6 +4,7 @@ import {
   getTickDelay,
   pauseGame,
   queueDirection,
+  resumeGame,
   startGame,
   stepState
 } from "./engine.js";
@@ -11,13 +12,28 @@ import { bindKeyboard, bindTouch } from "./input.js";
 import { createRenderer } from "./renderer.js";
 import { createSeededRandomizer, getDailyChallengeSeed, normalizeSeed } from "./seed.js";
 import {
+  COLOR_THEMES,
+  DEFAULT_GAME_SETTINGS,
+  GAME_MODES,
+  MAP_OPTIONS,
+  SPEED_OPTIONS,
+  getEffectiveSpeedOption,
+  getGameMode,
+  getMapOption,
+  isSpeedLockedByMode,
+  normalizeSettings
+} from "./settings.js";
+import { DEFAULT_SNAKE_COLOR_ID, SNAKE_COLOR_OPTIONS } from "./snake-colors.js";
+import {
   loadBestScore,
   loadChallengeBestScore,
+  loadSettings,
   saveBestScore,
-  saveChallengeBestScore
+  saveChallengeBestScore,
+  saveSettings
 } from "./storage.js";
 
-const GAME_MODES = Object.freeze({
+const PLAY_CONTEXTS = Object.freeze({
   CLASSIC: "classic",
   CHALLENGE: "challenge"
 });
@@ -27,6 +43,8 @@ const scoreValue = document.querySelector("#score-value");
 const bestLabel = document.querySelector("#best-label");
 const bestValue = document.querySelector("#best-value");
 const speedValue = document.querySelector("#speed-value");
+const modeValue = document.querySelector("#mode-value");
+const mapValue = document.querySelector("#map-value");
 const statusLabel = document.querySelector("#status-label");
 const playButton = document.querySelector("#play-button");
 const pauseButton = document.querySelector("#pause-button");
@@ -37,11 +55,25 @@ const challengeSeedInput = document.querySelector("#challenge-seed-input");
 const seedChallengeButton = document.querySelector("#seed-challenge-button");
 const copySeedButton = document.querySelector("#copy-seed-button");
 const challengeNote = document.querySelector("#challenge-note");
+const settingsButton = document.querySelector("#settings-button");
+const settingsDialog = document.querySelector("#settings-dialog");
+const settingsForm = document.querySelector("#settings-form");
+const modeSetting = document.querySelector("#mode-setting");
+const speedSetting = document.querySelector("#speed-setting");
+const speedSettingLabel = document.querySelector("#speed-setting-label");
+const colorSetting = document.querySelector("#color-setting");
+const gridSetting = document.querySelector("#grid-setting");
+const mapSetting = document.querySelector("#map-setting");
+const snakeColorOptions = document.querySelector("#snake-color-options");
+const keepColorToggle = document.querySelector("#keep-color-toggle");
+const settingsResetButton = document.querySelector("#settings-reset-button");
 const render = createRenderer(canvas);
 
-let gameContext = readGameContextFromUrl();
-let state = createGameState(gameContext);
+let settings = loadSettings();
+let playContext = readPlayContextFromUrl();
+let state = createGameState(playContext);
 let loopTimer = null;
+let resumeAfterSettings = false;
 
 function setState(nextState, options = {}) {
   state = nextState;
@@ -50,7 +82,7 @@ function setState(nextState, options = {}) {
     saveCurrentBestScore();
   }
 
-  render(state);
+  render(state, settings);
   updateHud();
 }
 
@@ -73,7 +105,7 @@ function scheduleTick() {
     return;
   }
 
-  loopTimer = window.setTimeout(runTick, getTickDelay(state.score));
+  loopTimer = window.setTimeout(runTick, getTickDelay(state.score, currentSpeedOption().multiplier));
 }
 
 function clearTick() {
@@ -86,24 +118,53 @@ function clearTick() {
 }
 
 function play() {
+  if (state.status !== STATUS.READY) {
+    return;
+  }
+
   setState(startGame(state));
   scheduleTick();
   canvas.focus();
 }
 
-function pause() {
-  setState(pauseGame(state));
-  clearTick();
+function togglePause(options = {}) {
+  const { focusCanvas = true } = options;
+
+  if (state.status === STATUS.RUNNING) {
+    clearTick();
+    setState(pauseGame(state));
+    if (focusCanvas) {
+      canvas.focus();
+    }
+    return;
+  }
+
+  if (state.status === STATUS.PAUSED) {
+    setState(resumeGame(state));
+    scheduleTick();
+    if (focusCanvas) {
+      canvas.focus();
+    }
+  }
 }
 
 function restart() {
   clearTick();
-  setState(createGameState(gameContext));
+
+  if (!settings.keepSnakeColorOnRestart) {
+    setSettings({ ...settings, snakeColor: DEFAULT_SNAKE_COLOR_ID }, { reschedule: false });
+  }
+
+  setState(createGameState(playContext));
   canvas.focus();
 }
 
 function handleDirection(direction) {
-  if (state.status === STATUS.READY || state.status === STATUS.PAUSED) {
+  if (isSettingsOpen()) {
+    return;
+  }
+
+  if (state.status === STATUS.READY) {
     state = startGame(state);
   }
 
@@ -112,61 +173,72 @@ function handleDirection(direction) {
 }
 
 function updateHud() {
+  const speedOption = currentSpeedOption();
+  const mode = getGameMode(settings.mode);
+  const mapOption = currentMapOption();
   const challengeMode = isChallengeMode();
 
   scoreValue.textContent = String(state.score);
   bestLabel.textContent = challengeMode ? "Meilleur defi" : "Meilleur";
   bestValue.textContent = String(state.bestScore);
-  speedValue.textContent = `${(START_DELAY_MS / getTickDelay(state.score)).toFixed(1)}x`;
-  statusLabel.textContent = statusText(state.status);
-  playButton.disabled = state.status === STATUS.RUNNING || state.status === STATUS.GAME_OVER || state.status === STATUS.WON;
-  pauseButton.disabled = state.status !== STATUS.RUNNING;
+  modeValue.textContent = mode.label;
+  speedValue.textContent = `${speedOption.label} ${(START_DELAY_MS / getTickDelay(state.score, speedOption.multiplier)).toFixed(1)}x`;
+  mapValue.textContent = mapOption.label;
+  statusLabel.textContent = isSettingsOpen() ? "Reglages" : statusText(state.status);
+  playButton.disabled = state.status !== STATUS.READY;
+  pauseButton.disabled = state.status !== STATUS.RUNNING && state.status !== STATUS.PAUSED;
+  pauseButton.textContent = state.status === STATUS.PAUSED ? "Reprendre" : "Pause";
+  pauseButton.setAttribute("aria-pressed", String(state.status === STATUS.PAUSED));
   classicModeButton.setAttribute("aria-pressed", String(!challengeMode));
-  dailyChallengeButton.setAttribute("aria-pressed", String(challengeMode && gameContext.seed === getDailyChallengeSeed()));
+  dailyChallengeButton.setAttribute("aria-pressed", String(challengeMode && playContext.seed === getDailyChallengeSeed()));
   copySeedButton.disabled = !challengeMode;
-  challengeNote.textContent = challengeMode ? `Defi ${gameContext.seed}` : "Mode classique";
+  challengeNote.textContent = challengeMode ? `Defi ${playContext.seed}` : "Mode classique";
 }
 
 function createGameState(context) {
-  if (context.mode !== GAME_MODES.CHALLENGE) {
-    return createInitialState({ bestScore: loadBestScore() });
+  if (context.mode !== PLAY_CONTEXTS.CHALLENGE) {
+    return createInitialState({
+      bestScore: loadBestScore(),
+      mapId: settings.map
+    });
   }
 
   return createInitialState({
     bestScore: loadChallengeBestScore(context.seed),
+    mapId: settings.map,
     randomizer: createSeededRandomizer(context.seed)
   });
 }
 
 function saveCurrentBestScore() {
   if (isChallengeMode()) {
-    saveChallengeBestScore(gameContext.seed, state.bestScore);
+    saveChallengeBestScore(playContext.seed, state.bestScore);
     return;
   }
 
   saveBestScore(state.bestScore);
 }
 
-function readGameContextFromUrl() {
+function readPlayContextFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const seed = normalizeSeed(params.get("challenge"));
 
   if (!seed) {
-    return { mode: GAME_MODES.CLASSIC };
+    return { mode: PLAY_CONTEXTS.CLASSIC };
   }
 
-  return { mode: GAME_MODES.CHALLENGE, seed };
+  return { mode: PLAY_CONTEXTS.CHALLENGE, seed };
 }
 
 function switchToClassic() {
   replaceUrl(null);
-  startContext({ mode: GAME_MODES.CLASSIC });
+  startContext({ mode: PLAY_CONTEXTS.CLASSIC });
 }
 
 function startDailyChallenge() {
   const seed = getDailyChallengeSeed();
   replaceUrl(seed);
-  startContext({ mode: GAME_MODES.CHALLENGE, seed });
+  startContext({ mode: PLAY_CONTEXTS.CHALLENGE, seed });
 }
 
 function startSeedChallenge() {
@@ -177,14 +249,14 @@ function startSeedChallenge() {
   }
 
   replaceUrl(seed);
-  startContext({ mode: GAME_MODES.CHALLENGE, seed });
+  startContext({ mode: PLAY_CONTEXTS.CHALLENGE, seed });
 }
 
 function startContext(nextContext) {
   clearTick();
-  gameContext = nextContext;
+  playContext = nextContext;
   syncChallengeSeedInput();
-  setState(createGameState(gameContext));
+  setState(createGameState(playContext));
   canvas.focus();
 }
 
@@ -193,13 +265,13 @@ async function copyChallengeLink() {
     return;
   }
 
-  const shareUrl = buildChallengeUrl(gameContext.seed).toString();
+  const shareUrl = buildChallengeUrl(playContext.seed).toString();
 
   try {
     await navigator.clipboard.writeText(shareUrl);
     showTemporaryCopyLabel("Copie");
   } catch {
-    challengeSeedInput.value = gameContext.seed;
+    challengeSeedInput.value = playContext.seed;
     challengeSeedInput.select();
     showTemporaryCopyLabel("Selectionne");
   }
@@ -214,7 +286,7 @@ function showTemporaryCopyLabel(label) {
 }
 
 function syncChallengeSeedInput() {
-  challengeSeedInput.value = isChallengeMode() ? gameContext.seed : getDailyChallengeSeed();
+  challengeSeedInput.value = isChallengeMode() ? playContext.seed : getDailyChallengeSeed();
 }
 
 function replaceUrl(seed) {
@@ -235,7 +307,187 @@ function buildChallengeUrl(seed) {
 }
 
 function isChallengeMode() {
-  return gameContext.mode === GAME_MODES.CHALLENGE;
+  return playContext.mode === PLAY_CONTEXTS.CHALLENGE;
+}
+
+function currentSpeedOption() {
+  return getEffectiveSpeedOption(settings);
+}
+
+function currentMapOption() {
+  return getMapOption(settings.map);
+}
+
+function populateSettingsControls() {
+  modeSetting.replaceChildren(...GAME_MODES.map(createOptionElement));
+  speedSetting.replaceChildren(...SPEED_OPTIONS.map(createOptionElement));
+  colorSetting.replaceChildren(...COLOR_THEMES.map(createOptionElement));
+  mapSetting.replaceChildren(...MAP_OPTIONS.map(createMapOptionElement));
+  snakeColorOptions.replaceChildren(...SNAKE_COLOR_OPTIONS.map(createColorButton));
+  syncSettingsControls();
+}
+
+function createOptionElement(option) {
+  const element = document.createElement("option");
+
+  element.value = option.id;
+  element.textContent = option.label;
+
+  return element;
+}
+
+function createMapOptionElement(option) {
+  const element = createOptionElement(option);
+
+  element.textContent = `${option.label} - ${option.summary}`;
+
+  return element;
+}
+
+function createColorButton(option) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "color-choice";
+  button.dataset.colorId = option.id;
+  button.style.setProperty("--snake-color", option.fill);
+  button.style.setProperty("--snake-accent", option.accent);
+  button.textContent = option.label;
+  button.setAttribute("aria-pressed", "false");
+
+  return button;
+}
+
+function syncSettingsControls() {
+  const speedLocked = isSpeedLockedByMode(settings.mode);
+
+  modeSetting.value = settings.mode;
+  speedSetting.value = currentSpeedOption().id;
+  speedSetting.disabled = speedLocked;
+  speedSettingLabel.textContent = speedLocked ? "Vitesse du mode" : "Vitesse";
+  colorSetting.value = settings.color;
+  gridSetting.checked = settings.showGrid;
+  mapSetting.value = settings.map;
+  keepColorToggle.checked = settings.keepSnakeColorOnRestart;
+  updateColorControls();
+}
+
+function updateColorControls() {
+  for (const button of snakeColorOptions.querySelectorAll("[data-color-id]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.colorId === settings.snakeColor));
+  }
+}
+
+function setSettings(nextSettings, options = {}) {
+  const { reschedule = true } = options;
+  const nextNormalizedSettings = normalizeSettings(nextSettings);
+  const mapChanged = nextNormalizedSettings.map !== state.map.id;
+
+  settings = nextNormalizedSettings;
+  savePersistableSettings();
+  syncSettingsControls();
+
+  if (mapChanged) {
+    resumeAfterSettings = false;
+    clearTick();
+    setState(createGameState(playContext));
+    return;
+  }
+
+  render(state, settings);
+  updateHud();
+
+  if (reschedule && state.status === STATUS.RUNNING && !isSettingsOpen()) {
+    clearTick();
+    scheduleTick();
+  }
+}
+
+function handleSettingsChange(event) {
+  setSettings({
+    ...settings,
+    mode: modeSetting.value,
+    speed: event.target === speedSetting ? speedSetting.value : settings.speed,
+    color: colorSetting.value,
+    showGrid: gridSetting.checked,
+    map: mapSetting.value
+  });
+}
+
+function savePersistableSettings() {
+  const settingsToSave = settings.keepSnakeColorOnRestart
+    ? settings
+    : { ...settings, snakeColor: DEFAULT_SNAKE_COLOR_ID };
+
+  saveSettings(settingsToSave);
+}
+
+function setSnakeColor(colorId) {
+  setSettings({
+    ...settings,
+    snakeColor: colorId
+  });
+}
+
+function setKeepColorOnRestart(keepColor) {
+  setSettings({
+    ...settings,
+    keepSnakeColorOnRestart: keepColor
+  });
+}
+
+function openSettings() {
+  if (isSettingsOpen()) {
+    return;
+  }
+
+  resumeAfterSettings = state.status === STATUS.RUNNING;
+  clearTick();
+  syncSettingsControls();
+  showSettingsDialog();
+  settingsButton.setAttribute("aria-expanded", "true");
+  updateHud();
+  modeSetting.focus();
+}
+
+function showSettingsDialog() {
+  if (typeof settingsDialog.showModal === "function") {
+    settingsDialog.showModal();
+    return;
+  }
+
+  settingsDialog.setAttribute("open", "");
+}
+
+function closeSettingsDialog() {
+  if (!isSettingsOpen()) {
+    return;
+  }
+
+  if (typeof settingsDialog.close === "function") {
+    settingsDialog.close();
+    return;
+  }
+
+  settingsDialog.removeAttribute("open");
+  handleSettingsClosed();
+}
+
+function isSettingsOpen() {
+  return settingsDialog.open || settingsDialog.hasAttribute("open");
+}
+
+function handleSettingsClosed() {
+  const shouldResume = resumeAfterSettings && state.status === STATUS.RUNNING;
+
+  resumeAfterSettings = false;
+  settingsButton.setAttribute("aria-expanded", "false");
+  updateHud();
+
+  if (shouldResume) {
+    scheduleTick();
+  }
+
+  settingsButton.focus();
 }
 
 function statusText(status) {
@@ -255,7 +507,7 @@ function statusText(status) {
 }
 
 playButton.addEventListener("click", play);
-pauseButton.addEventListener("click", pause);
+pauseButton.addEventListener("click", togglePause);
 restartButton.addEventListener("click", restart);
 classicModeButton.addEventListener("click", switchToClassic);
 dailyChallengeButton.addEventListener("click", startDailyChallenge);
@@ -266,17 +518,56 @@ challengeSeedInput.addEventListener("keydown", (event) => {
     startSeedChallenge();
   }
 });
+settingsButton.addEventListener("click", openSettings);
+settingsForm.addEventListener("submit", (event) => {
+  if (typeof settingsDialog.close !== "function") {
+    event.preventDefault();
+    closeSettingsDialog();
+  }
+});
+modeSetting.addEventListener("change", handleSettingsChange);
+speedSetting.addEventListener("change", handleSettingsChange);
+colorSetting.addEventListener("change", handleSettingsChange);
+gridSetting.addEventListener("change", handleSettingsChange);
+mapSetting.addEventListener("change", handleSettingsChange);
+snakeColorOptions.addEventListener("click", (event) => {
+  if (!(event.target instanceof Element)) {
+    return;
+  }
 
-bindKeyboard(handleDirection);
+  const colorButton = event.target.closest("[data-color-id]");
+
+  if (!colorButton) {
+    return;
+  }
+
+  setSnakeColor(colorButton.dataset.colorId);
+});
+keepColorToggle.addEventListener("change", () => {
+  setKeepColorOnRestart(keepColorToggle.checked);
+});
+settingsResetButton.addEventListener("click", () => setSettings(DEFAULT_GAME_SETTINGS));
+settingsDialog.addEventListener("close", handleSettingsClosed);
+settingsDialog.addEventListener("click", (event) => {
+  if (event.target === settingsDialog) {
+    closeSettingsDialog();
+  }
+});
+
+populateSettingsControls();
+syncChallengeSeedInput();
+
+bindKeyboard(handleDirection, {
+  shouldIgnore: isSettingsOpen
+});
 bindTouch(canvas, handleDirection);
 
 window.addEventListener("blur", () => {
   if (state.status === STATUS.RUNNING) {
-    pause();
+    togglePause({ focusCanvas: false });
   }
 });
 
-window.addEventListener("resize", () => render(state));
+window.addEventListener("resize", () => render(state, settings));
 
-syncChallengeSeedInput();
 setState(queueDirection(state, DIRECTIONS.RIGHT));
