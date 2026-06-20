@@ -400,6 +400,12 @@ h1 {
   flex: 0 0 auto;
 }
 
+.settings-field select:disabled {
+  color: var(--yellow);
+  cursor: not-allowed;
+  opacity: 1;
+}
+
 .settings-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -419,6 +425,7 @@ h1 {
   }
 
   .score-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

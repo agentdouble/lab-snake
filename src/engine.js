@@ -189,6 +189,10 @@ function addCells(cell, direction) {
   };
 }
 
+function copyCell(cell) {
+  return { x: cell.x, y: cell.y };
+}
+
 function isFreeCell(cell, occupiedCells, map) {
   return isValidMapCell(cell, map) && !containsCell(occupiedCells, cell);
 }
@@ -215,8 +219,4 @@ function isOpposite(first, second) {
 
 function cellKey(cell) {
   return `${cell.x}:${cell.y}`;
-}
-
-function copyCell(cell) {
-  return { x: cell.x, y: cell.y };
 }
