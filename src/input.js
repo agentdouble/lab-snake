@@ -21,8 +21,14 @@ const KEY_DIRECTIONS = new Map([
 
 const SWIPE_THRESHOLD_PX = 24;
 
-export function bindKeyboard(onDirection) {
+export function bindKeyboard(onDirection, options = {}) {
+  const { shouldHandleEvent = () => true } = options;
+
   window.addEventListener("keydown", (event) => {
+    if (!shouldHandleEvent(event)) {
+      return;
+    }
+
     const direction = KEY_DIRECTIONS.get(event.key);
 
     if (!direction) {

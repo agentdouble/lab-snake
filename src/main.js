@@ -10,7 +10,8 @@ import {
 } from "./engine.js";
 import { bindKeyboard, bindTouch } from "./input.js";
 import { createRenderer } from "./renderer.js";
-import { loadBestScore, saveBestScore } from "./storage.js";
+import { createSettingsMenu } from "./settings-menu.js";
+import { loadBestScore, loadSettings, saveBestScore, saveSettings } from "./storage.js";
 
 const canvas = document.querySelector("#game-canvas");
 const scoreValue = document.querySelector("#score-value");
@@ -20,10 +21,18 @@ const statusLabel = document.querySelector("#status-label");
 const playButton = document.querySelector("#play-button");
 const pauseButton = document.querySelector("#pause-button");
 const restartButton = document.querySelector("#restart-button");
+const settingsButton = document.querySelector("#settings-button");
+const settingsLayer = document.querySelector("#settings-layer");
+const settingsPanel = document.querySelector("#settings-panel");
+const settingsBackdrop = document.querySelector("#settings-backdrop");
+const settingsCloseButton = document.querySelector("#settings-close-button");
+const gridToggle = document.querySelector("#grid-toggle");
 const render = createRenderer(canvas);
 
 let state = createInitialState({ bestScore: loadBestScore() });
+let settings = loadSettings();
 let loopTimer = null;
+let resumeAfterSettings = false;
 
 function setState(nextState, options = {}) {
   state = nextState;
@@ -32,7 +41,7 @@ function setState(nextState, options = {}) {
     saveBestScore(state.bestScore);
   }
 
-  render(state);
+  render(state, settings);
   updateHud();
 }
 
@@ -84,6 +93,29 @@ function restart() {
   canvas.focus();
 }
 
+function openSettings() {
+  resumeAfterSettings = state.status === STATUS.RUNNING;
+
+  if (resumeAfterSettings) {
+    pause();
+  }
+}
+
+function closeSettings() {
+  if (!resumeAfterSettings) {
+    return;
+  }
+
+  resumeAfterSettings = false;
+  play();
+}
+
+function updateSettings(nextSettings) {
+  settings = nextSettings;
+  saveSettings(settings);
+  render(state, settings);
+}
+
 function handleDirection(direction) {
   if (state.status === STATUS.READY || state.status === STATUS.PAUSED) {
     state = startGame(state);
@@ -122,7 +154,22 @@ playButton.addEventListener("click", play);
 pauseButton.addEventListener("click", pause);
 restartButton.addEventListener("click", restart);
 
-bindKeyboard(handleDirection);
+const settingsMenu = createSettingsMenu({
+  layer: settingsLayer,
+  panel: settingsPanel,
+  backdrop: settingsBackdrop,
+  openButton: settingsButton,
+  closeButton: settingsCloseButton,
+  gridToggle,
+  settings,
+  onOpen: openSettings,
+  onClose: closeSettings,
+  onSettingsChange: updateSettings
+});
+
+bindKeyboard(handleDirection, {
+  shouldHandleEvent: () => !settingsMenu.isOpen()
+});
 bindTouch(canvas, handleDirection);
 
 window.addEventListener("blur", () => {
@@ -131,6 +178,6 @@ window.addEventListener("blur", () => {
   }
 });
 
-window.addEventListener("resize", () => render(state));
+window.addEventListener("resize", () => render(state, settings));
 
 setState(queueDirection(state, DIRECTIONS.RIGHT));

@@ -15,18 +15,23 @@ const COLORS = Object.freeze({
 export function createRenderer(canvas) {
   const context = canvas.getContext("2d");
 
-  return function render(state) {
+  return function render(state, settings = {}) {
     context.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    drawBoard(context);
+    drawBoard(context, settings);
     drawApple(context, state.apple);
     drawSnake(context, state.snake);
     drawStatus(context, state.status);
   };
 }
 
-function drawBoard(context) {
+function drawBoard(context, settings) {
   context.fillStyle = COLORS.board;
   context.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+  if (settings.showGrid === false) {
+    return;
+  }
+
   context.strokeStyle = COLORS.grid;
   context.lineWidth = 1;
 

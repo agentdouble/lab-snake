@@ -56,6 +56,12 @@ button {
   gap: 12px;
 }
 
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 h1 {
   margin: 0;
   font-size: clamp(2rem, 8vw, 4rem);
@@ -72,6 +78,37 @@ h1 {
   color: var(--yellow);
   text-align: center;
   font-weight: 800;
+}
+
+.icon-button {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.icon-button svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.icon-button:hover {
+  border-color: var(--cyan);
+}
+
+.icon-button:focus-visible {
+  outline: 3px solid rgba(76, 201, 240, 0.28);
+  outline-offset: 2px;
 }
 
 .score-strip {
@@ -164,6 +201,108 @@ h1 {
   cursor: not-allowed;
 }
 
+.settings-layer[hidden] {
+  display: none;
+}
+
+.settings-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  justify-items: end;
+}
+
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  border: 0;
+  background: rgba(5, 7, 8, 0.62);
+  cursor: pointer;
+}
+
+.settings-panel {
+  position: relative;
+  width: min(100%, 360px);
+  height: 100dvh;
+  padding: 18px;
+  border-left: 1px solid var(--line);
+  background: #181b20;
+  box-shadow: -24px 0 52px var(--shadow);
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.settings-panel:focus {
+  outline: none;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-header h2,
+.settings-section h3 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+.settings-header h2 {
+  font-size: 1.35rem;
+}
+
+.settings-section {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-section h3 {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.switch-row {
+  min-height: 60px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.switch-title,
+.switch-meta {
+  display: block;
+}
+
+.switch-title {
+  font-weight: 800;
+}
+
+.switch-meta {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.switch-input {
+  width: 46px;
+  height: 26px;
+  margin: 0;
+  accent-color: var(--green);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
 @media (max-width: 480px) {
   .game-shell {
     gap: 10px;
@@ -180,5 +319,19 @@ h1 {
 
   .control-strip {
     grid-template-columns: 1fr;
+  }
+
+  .settings-layer {
+    align-items: end;
+    justify-items: stretch;
+  }
+
+  .settings-panel {
+    width: 100%;
+    height: auto;
+    max-height: 82dvh;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+    box-shadow: 0 -22px 44px var(--shadow);
   }
 }
