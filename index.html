@@ -10,22 +10,16 @@
     <main class="game-shell" aria-label="Snake">
       <header class="top-bar">
         <h1>Snake</h1>
-        <div class="top-actions">
-          <div class="status-pill" id="status-label">Pret</div>
+        <div class="header-actions">
           <button
-            class="icon-button"
+            class="settings-button"
             type="button"
             id="settings-button"
-            aria-label="Ouvrir les reglages"
-            aria-controls="settings-panel"
+            aria-haspopup="dialog"
+            aria-controls="settings-dialog"
             aria-expanded="false"
-            title="Reglages"
-          >
-            <svg aria-hidden="true" viewBox="0 0 24 24">
-              <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"></path>
-              <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.06.06a2.15 2.15 0 0 1-3.04 3.04l-.06-.06A1.8 1.8 0 0 0 14.74 19a1.8 1.8 0 0 0-1.09 1.64v.17a2.15 2.15 0 0 1-4.3 0v-.1A1.8 1.8 0 0 0 8.2 19a1.8 1.8 0 0 0-1.98.36l-.06.06a2.15 2.15 0 1 1-3.04-3.04l.06-.06A1.8 1.8 0 0 0 3.54 14a1.8 1.8 0 0 0-1.64-1.09h-.1a2.15 2.15 0 0 1 0-4.3h.1A1.8 1.8 0 0 0 3.54 7.5a1.8 1.8 0 0 0-.36-1.98l-.06-.06a2.15 2.15 0 1 1 3.04-3.04l.06.06A1.8 1.8 0 0 0 8.2 2.84h.16A1.8 1.8 0 0 0 9.35 1.2v-.1a2.15 2.15 0 0 1 4.3 0v.1a1.8 1.8 0 0 0 1.09 1.64h.16a1.8 1.8 0 0 0 1.98-.36l.06-.06a2.15 2.15 0 1 1 3.04 3.04l-.06.06A1.8 1.8 0 0 0 19.4 7.5v.16a1.8 1.8 0 0 0 1.64.99h.17a2.15 2.15 0 0 1 0 4.3h-.1A1.8 1.8 0 0 0 19.4 15Z"></path>
-            </svg>
-          </button>
+          >Reglages</button>
+          <div class="status-pill" id="status-label">Pret</div>
         </div>
       </header>
 
@@ -60,38 +54,37 @@
         <button class="control-button" type="button" id="restart-button">Rejouer</button>
       </section>
 
-      <section class="settings-layer" id="settings-layer" hidden>
-        <button class="settings-backdrop" type="button" id="settings-backdrop" aria-label="Fermer les reglages"></button>
-        <aside
-          class="settings-panel"
-          id="settings-panel"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="settings-title"
-          tabindex="-1"
-        >
-          <header class="settings-header">
+      <dialog class="settings-dialog" id="settings-dialog" aria-labelledby="settings-title">
+        <form class="settings-panel" method="dialog" id="settings-form">
+          <div class="settings-header">
             <h2 id="settings-title">Reglages</h2>
-            <button class="icon-button" type="button" id="settings-close-button" aria-label="Fermer les reglages" title="Fermer">
-              <svg aria-hidden="true" viewBox="0 0 24 24">
-                <path d="M18 6 6 18"></path>
-                <path d="m6 6 12 12"></path>
-              </svg>
-            </button>
-          </header>
-
-          <div class="settings-section">
-            <h3>Affichage</h3>
-            <label class="switch-row" for="grid-toggle">
-              <span>
-                <span class="switch-title">Grille</span>
-                <span class="switch-meta">Plateau quadrille</span>
-              </span>
-              <input class="switch-input" type="checkbox" id="grid-toggle">
-            </label>
+            <button class="settings-close" type="submit">Fermer</button>
           </div>
-        </aside>
-      </section>
+
+          <label class="settings-field" for="speed-setting">
+            <span>Vitesse</span>
+            <select id="speed-setting" name="speed"></select>
+          </label>
+
+          <label class="settings-field" for="color-setting">
+            <span>Couleur</span>
+            <select id="color-setting" name="color"></select>
+          </label>
+
+          <label class="settings-toggle" for="grid-setting">
+            <span>
+              <span class="settings-toggle-title">Grille</span>
+              <span class="settings-toggle-meta">Afficher le quadrillage du plateau</span>
+            </span>
+            <input type="checkbox" id="grid-setting" name="showGrid">
+          </label>
+
+          <menu class="settings-actions">
+            <button class="control-button" type="button" id="settings-reset-button">Defaut</button>
+            <button class="control-button primary" type="submit">Valider</button>
+          </menu>
+        </form>
+      </dialog>
     </main>
 
     <script type="module" src="./src/main.js"></script>

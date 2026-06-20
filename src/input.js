@@ -22,10 +22,10 @@ const KEY_DIRECTIONS = new Map([
 const SWIPE_THRESHOLD_PX = 24;
 
 export function bindKeyboard(onDirection, options = {}) {
-  const { shouldHandleEvent = () => true } = options;
+  const { shouldIgnore = () => false } = options;
 
   window.addEventListener("keydown", (event) => {
-    if (!shouldHandleEvent(event)) {
+    if (shouldIgnore(event) || isInteractiveTarget(event.target)) {
       return;
     }
 
@@ -38,6 +38,13 @@ export function bindKeyboard(onDirection, options = {}) {
     event.preventDefault();
     onDirection(direction);
   });
+}
+
+function isInteractiveTarget(target) {
+  return target instanceof HTMLElement && (
+    target.isContentEditable ||
+    ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName)
+  );
 }
 
 export function bindTouch(target, onDirection) {

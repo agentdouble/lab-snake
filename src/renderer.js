@@ -1,38 +1,29 @@
 import { CANVAS_SIZE, GRID_SIZE, STATUS } from "./constants.js";
-
-const COLORS = Object.freeze({
-  board: "#111714",
-  grid: "rgba(214, 236, 218, 0.08)",
-  snakeHead: "#d8f75c",
-  snakeBody: "#4fd06b",
-  snakeShadow: "#19724d",
-  apple: "#ef476f",
-  appleCore: "#ffd166",
-  overlay: "rgba(11, 13, 12, 0.58)",
-  text: "#f3f7ee"
-});
+import { getColorTheme } from "./settings.js";
 
 export function createRenderer(canvas) {
   const context = canvas.getContext("2d");
 
   return function render(state, settings = {}) {
+    const colors = getColorTheme(settings?.color).colors;
+
     context.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    drawBoard(context, settings);
-    drawApple(context, state.apple);
-    drawSnake(context, state.snake);
-    drawStatus(context, state.status);
+    drawBoard(context, colors, settings);
+    drawApple(context, state.apple, colors);
+    drawSnake(context, state.snake, colors);
+    drawStatus(context, state.status, colors);
   };
 }
 
-function drawBoard(context, settings) {
-  context.fillStyle = COLORS.board;
+function drawBoard(context, colors, settings) {
+  context.fillStyle = colors.board;
   context.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
   if (settings.showGrid === false) {
     return;
   }
 
-  context.strokeStyle = COLORS.grid;
+  context.strokeStyle = colors.grid;
   context.lineWidth = 1;
 
   const cellSize = CANVAS_SIZE / GRID_SIZE;
@@ -52,18 +43,18 @@ function drawBoard(context, settings) {
   }
 }
 
-function drawSnake(context, snake) {
+function drawSnake(context, snake, colors) {
   snake.forEach((cell, index) => {
     const isHead = index === 0;
-    drawRoundedCell(context, cell, isHead ? COLORS.snakeHead : COLORS.snakeBody, isHead ? 4 : 5);
+    drawRoundedCell(context, cell, isHead ? colors.snakeHead : colors.snakeBody, isHead ? 4 : 5);
 
     if (isHead) {
-      drawRoundedCell(context, cell, COLORS.snakeShadow, 11);
+      drawRoundedCell(context, cell, colors.snakeShadow, 11);
     }
   });
 }
 
-function drawApple(context, apple) {
+function drawApple(context, apple, colors) {
   if (!apple) {
     return;
   }
@@ -72,12 +63,12 @@ function drawApple(context, apple) {
   const centerX = apple.x * cellSize + cellSize / 2;
   const centerY = apple.y * cellSize + cellSize / 2;
 
-  context.fillStyle = COLORS.apple;
+  context.fillStyle = colors.apple;
   context.beginPath();
   context.arc(centerX, centerY, cellSize * 0.33, 0, Math.PI * 2);
   context.fill();
 
-  context.fillStyle = COLORS.appleCore;
+  context.fillStyle = colors.appleCore;
   context.beginPath();
   context.arc(centerX + cellSize * 0.12, centerY - cellSize * 0.12, cellSize * 0.08, 0, Math.PI * 2);
   context.fill();
@@ -96,16 +87,16 @@ function drawRoundedCell(context, cell, color, inset) {
   context.fill();
 }
 
-function drawStatus(context, status) {
+function drawStatus(context, status, colors) {
   if (status === STATUS.RUNNING) {
     return;
   }
 
   const label = statusLabel(status);
 
-  context.fillStyle = COLORS.overlay;
+  context.fillStyle = colors.overlay;
   context.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-  context.fillStyle = COLORS.text;
+  context.fillStyle = colors.text;
   context.font = "700 44px Inter, ui-sans-serif, system-ui, sans-serif";
   context.textAlign = "center";
   context.textBaseline = "middle";

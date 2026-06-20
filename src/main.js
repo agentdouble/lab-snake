@@ -10,7 +10,13 @@ import {
 } from "./engine.js";
 import { bindKeyboard, bindTouch } from "./input.js";
 import { createRenderer } from "./renderer.js";
-import { createSettingsMenu } from "./settings-menu.js";
+import {
+  COLOR_THEMES,
+  DEFAULT_GAME_SETTINGS,
+  SPEED_OPTIONS,
+  getSpeedOption,
+  normalizeSettings
+} from "./settings.js";
 import { loadBestScore, loadSettings, saveBestScore, saveSettings } from "./storage.js";
 
 const canvas = document.querySelector("#game-canvas");
@@ -22,11 +28,12 @@ const playButton = document.querySelector("#play-button");
 const pauseButton = document.querySelector("#pause-button");
 const restartButton = document.querySelector("#restart-button");
 const settingsButton = document.querySelector("#settings-button");
-const settingsLayer = document.querySelector("#settings-layer");
-const settingsPanel = document.querySelector("#settings-panel");
-const settingsBackdrop = document.querySelector("#settings-backdrop");
-const settingsCloseButton = document.querySelector("#settings-close-button");
-const gridToggle = document.querySelector("#grid-toggle");
+const settingsDialog = document.querySelector("#settings-dialog");
+const settingsForm = document.querySelector("#settings-form");
+const speedSetting = document.querySelector("#speed-setting");
+const colorSetting = document.querySelector("#color-setting");
+const gridSetting = document.querySelector("#grid-setting");
+const settingsResetButton = document.querySelector("#settings-reset-button");
 const render = createRenderer(canvas);
 
 let state = createInitialState({ bestScore: loadBestScore() });
@@ -64,7 +71,7 @@ function scheduleTick() {
     return;
   }
 
-  loopTimer = window.setTimeout(runTick, getTickDelay(state.score));
+  loopTimer = window.setTimeout(runTick, getTickDelay(state.score, currentSpeedOption().multiplier));
 }
 
 function clearTick() {
@@ -93,30 +100,11 @@ function restart() {
   canvas.focus();
 }
 
-function openSettings() {
-  resumeAfterSettings = state.status === STATUS.RUNNING;
-
-  if (resumeAfterSettings) {
-    pause();
-  }
-}
-
-function closeSettings() {
-  if (!resumeAfterSettings) {
+function handleDirection(direction) {
+  if (isSettingsOpen()) {
     return;
   }
 
-  resumeAfterSettings = false;
-  play();
-}
-
-function updateSettings(nextSettings) {
-  settings = nextSettings;
-  saveSettings(settings);
-  render(state, settings);
-}
-
-function handleDirection(direction) {
   if (state.status === STATUS.READY || state.status === STATUS.PAUSED) {
     state = startGame(state);
   }
@@ -126,12 +114,115 @@ function handleDirection(direction) {
 }
 
 function updateHud() {
+  const speedOption = currentSpeedOption();
+
   scoreValue.textContent = String(state.score);
   bestValue.textContent = String(state.bestScore);
-  speedValue.textContent = `${(START_DELAY_MS / getTickDelay(state.score)).toFixed(1)}x`;
-  statusLabel.textContent = statusText(state.status);
+  speedValue.textContent = `${speedOption.label} ${(START_DELAY_MS / getTickDelay(state.score, speedOption.multiplier)).toFixed(1)}x`;
+  statusLabel.textContent = isSettingsOpen() ? "Reglages" : statusText(state.status);
   playButton.disabled = state.status === STATUS.RUNNING || state.status === STATUS.GAME_OVER || state.status === STATUS.WON;
   pauseButton.disabled = state.status !== STATUS.RUNNING;
+}
+
+function currentSpeedOption() {
+  return getSpeedOption(settings.speed);
+}
+
+function populateSettingsControls() {
+  speedSetting.replaceChildren(...SPEED_OPTIONS.map(createOptionElement));
+  colorSetting.replaceChildren(...COLOR_THEMES.map(createOptionElement));
+  syncSettingsControls();
+}
+
+function createOptionElement(option) {
+  const element = document.createElement("option");
+
+  element.value = option.id;
+  element.textContent = option.label;
+
+  return element;
+}
+
+function syncSettingsControls() {
+  speedSetting.value = settings.speed;
+  colorSetting.value = settings.color;
+  gridSetting.checked = settings.showGrid;
+}
+
+function setSettings(nextSettings) {
+  settings = normalizeSettings(nextSettings);
+  saveSettings(settings);
+  syncSettingsControls();
+  render(state, settings);
+  updateHud();
+
+  if (state.status === STATUS.RUNNING && !isSettingsOpen()) {
+    clearTick();
+    scheduleTick();
+  }
+}
+
+function handleSettingsChange() {
+  setSettings({
+    speed: speedSetting.value,
+    color: colorSetting.value,
+    showGrid: gridSetting.checked
+  });
+}
+
+function openSettings() {
+  if (isSettingsOpen()) {
+    return;
+  }
+
+  resumeAfterSettings = state.status === STATUS.RUNNING;
+  clearTick();
+  syncSettingsControls();
+  showSettingsDialog();
+  settingsButton.setAttribute("aria-expanded", "true");
+  updateHud();
+  speedSetting.focus();
+}
+
+function showSettingsDialog() {
+  if (typeof settingsDialog.showModal === "function") {
+    settingsDialog.showModal();
+    return;
+  }
+
+  settingsDialog.setAttribute("open", "");
+}
+
+function closeSettingsDialog() {
+  if (!isSettingsOpen()) {
+    return;
+  }
+
+  if (typeof settingsDialog.close === "function") {
+    settingsDialog.close();
+    return;
+  }
+
+  settingsDialog.removeAttribute("open");
+  handleSettingsClosed();
+}
+
+function isSettingsOpen() {
+  return settingsDialog.open || settingsDialog.hasAttribute("open");
+}
+
+function handleSettingsClosed() {
+  const shouldResume = resumeAfterSettings && state.status === STATUS.RUNNING;
+
+  resumeAfterSettings = false;
+  settingsButton.setAttribute("aria-expanded", "false");
+  updateHud();
+
+  if (shouldResume) {
+    scheduleTick();
+  }
+
+  settingsButton.focus();
 }
 
 function statusText(status) {
@@ -153,22 +244,28 @@ function statusText(status) {
 playButton.addEventListener("click", play);
 pauseButton.addEventListener("click", pause);
 restartButton.addEventListener("click", restart);
-
-const settingsMenu = createSettingsMenu({
-  layer: settingsLayer,
-  panel: settingsPanel,
-  backdrop: settingsBackdrop,
-  openButton: settingsButton,
-  closeButton: settingsCloseButton,
-  gridToggle,
-  settings,
-  onOpen: openSettings,
-  onClose: closeSettings,
-  onSettingsChange: updateSettings
+settingsButton.addEventListener("click", openSettings);
+settingsForm.addEventListener("submit", (event) => {
+  if (typeof settingsDialog.close !== "function") {
+    event.preventDefault();
+    closeSettingsDialog();
+  }
+});
+speedSetting.addEventListener("change", handleSettingsChange);
+colorSetting.addEventListener("change", handleSettingsChange);
+gridSetting.addEventListener("change", handleSettingsChange);
+settingsResetButton.addEventListener("click", () => setSettings(DEFAULT_GAME_SETTINGS));
+settingsDialog.addEventListener("close", handleSettingsClosed);
+settingsDialog.addEventListener("click", (event) => {
+  if (event.target === settingsDialog) {
+    closeSettingsDialog();
+  }
 });
 
+populateSettingsControls();
+
 bindKeyboard(handleDirection, {
-  shouldHandleEvent: () => !settingsMenu.isOpen()
+  shouldIgnore: isSettingsOpen
 });
 bindTouch(canvas, handleDirection);
 

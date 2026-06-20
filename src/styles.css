@@ -53,13 +53,8 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
-}
-
-.top-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 h1 {
@@ -67,6 +62,14 @@ h1 {
   font-size: clamp(2rem, 8vw, 4rem);
   line-height: 0.9;
   letter-spacing: 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .status-pill {
@@ -80,34 +83,36 @@ h1 {
   font-weight: 800;
 }
 
-.icon-button {
-  width: 44px;
-  height: 44px;
+.settings-button,
+.settings-close {
+  min-height: 40px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--panel);
+  background: var(--panel-strong);
   color: var(--ink);
-  display: grid;
-  place-items: center;
+  font-weight: 800;
   cursor: pointer;
 }
 
-.icon-button svg {
-  width: 22px;
-  height: 22px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2;
+.settings-button {
+  padding: 8px 12px;
 }
 
-.icon-button:hover {
+.settings-close {
+  padding: 8px 11px;
+}
+
+.settings-button:hover,
+.settings-close:hover {
   border-color: var(--cyan);
 }
 
-.icon-button:focus-visible {
-  outline: 3px solid rgba(76, 201, 240, 0.28);
+.settings-button:focus-visible,
+.settings-close:focus-visible,
+.settings-field select:focus-visible,
+.settings-toggle input:focus-visible,
+.control-button:focus-visible {
+  outline: 3px solid rgba(76, 201, 240, 0.35);
   outline-offset: 2px;
 }
 
@@ -201,42 +206,33 @@ h1 {
   cursor: not-allowed;
 }
 
-.settings-layer[hidden] {
+.settings-dialog {
+  width: min(92vw, 430px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 24px 70px var(--shadow);
+}
+
+.settings-dialog:not([open]) {
   display: none;
 }
 
-.settings-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 20;
-  display: grid;
-  justify-items: end;
+.settings-dialog[open] {
+  display: block;
 }
 
-.settings-backdrop {
-  position: fixed;
-  inset: 0;
-  border: 0;
-  background: rgba(5, 7, 8, 0.62);
-  cursor: pointer;
+.settings-dialog::backdrop {
+  background: rgba(7, 8, 10, 0.68);
 }
 
 .settings-panel {
-  position: relative;
-  width: min(100%, 360px);
-  height: 100dvh;
-  padding: 18px;
-  border-left: 1px solid var(--line);
-  background: #181b20;
-  box-shadow: -24px 0 52px var(--shadow);
   display: grid;
-  align-content: start;
-  gap: 16px;
-  overflow-y: auto;
-}
-
-.settings-panel:focus {
-  outline: none;
+  gap: 14px;
+  margin: 0;
+  padding: 18px;
 }
 
 .settings-header {
@@ -246,55 +242,72 @@ h1 {
   gap: 12px;
 }
 
-.settings-header h2,
-.settings-section h3 {
+.settings-header h2 {
   margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.1;
   letter-spacing: 0;
 }
 
-.settings-header h2 {
-  font-size: 1.35rem;
-}
-
-.settings-section {
+.settings-field {
+  min-width: 0;
   display: grid;
-  gap: 10px;
+  gap: 7px;
 }
 
-.settings-section h3 {
+.settings-field span {
   color: var(--muted);
   font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
-.switch-row {
+.settings-field select {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: var(--panel-strong);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 800;
+}
+
+.settings-toggle {
+  min-width: 0;
   min-height: 60px;
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--panel);
+  background: var(--panel-strong);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
 }
 
-.switch-title,
-.switch-meta {
+.settings-toggle > span {
+  min-width: 0;
+}
+
+.settings-toggle-title,
+.settings-toggle-meta {
   display: block;
 }
 
-.switch-title {
+.settings-toggle-title {
   font-weight: 800;
 }
 
-.switch-meta {
+.settings-toggle-meta {
   margin-top: 3px;
   color: var(--muted);
   font-size: 0.9rem;
 }
 
-.switch-input {
+.settings-toggle input {
   width: 46px;
   height: 26px;
   margin: 0;
@@ -303,9 +316,22 @@ h1 {
   flex: 0 0 auto;
 }
 
+.settings-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 2px 0 0;
+  padding: 0;
+}
+
 @media (max-width: 480px) {
   .game-shell {
     gap: 10px;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .score-strip {
@@ -321,17 +347,11 @@ h1 {
     grid-template-columns: 1fr;
   }
 
-  .settings-layer {
-    align-items: end;
-    justify-items: stretch;
+  .settings-dialog {
+    width: calc(100vw - 24px);
   }
 
-  .settings-panel {
-    width: 100%;
-    height: auto;
-    max-height: 82dvh;
-    border-top: 1px solid var(--line);
-    border-left: 0;
-    box-shadow: 0 -22px 44px var(--shadow);
+  .settings-actions {
+    grid-template-columns: 1fr;
   }
 }
