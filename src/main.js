@@ -1,16 +1,17 @@
-import { DIRECTIONS, START_DELAY_MS, STATUS } from "./constants.js";
+import { START_DELAY_MS, STATUS } from "./constants.js";
 import {
   createInitialState,
   getTickDelay,
   pauseGame,
   queueDirection,
-  resetGame,
+  restoreState,
   resumeGame,
   startGame,
   stepState
 } from "./engine.js";
 import { bindKeyboard, bindTouch } from "./input.js";
 import { createRenderer } from "./renderer.js";
+import { createSeededRandomizer, getDailyChallengeSeed, normalizeSeed } from "./seed.js";
 import {
   COLOR_THEMES,
   DEFAULT_GAME_SETTINGS,
@@ -24,10 +25,27 @@ import {
   normalizeSettings
 } from "./settings.js";
 import { DEFAULT_SNAKE_COLOR_ID, SNAKE_COLOR_OPTIONS } from "./snake-colors.js";
-import { loadBestScore, loadSettings, saveBestScore, saveSettings, scoreContextKey } from "./storage.js";
+import {
+  clearSavedGame,
+  loadBestScore,
+  loadChallengeBestScore,
+  loadSavedGame,
+  loadSettings,
+  saveBestScore,
+  saveChallengeBestScore,
+  saveGameState,
+  saveSettings,
+  scoreContextKey
+} from "./storage.js";
+
+const PLAY_CONTEXTS = Object.freeze({
+  CLASSIC: "classic",
+  CHALLENGE: "challenge"
+});
 
 const canvas = document.querySelector("#game-canvas");
 const scoreValue = document.querySelector("#score-value");
+const bestLabel = document.querySelector("#best-label");
 const bestValue = document.querySelector("#best-value");
 const speedValue = document.querySelector("#speed-value");
 const modeValue = document.querySelector("#mode-value");
@@ -36,6 +54,12 @@ const statusLabel = document.querySelector("#status-label");
 const playButton = document.querySelector("#play-button");
 const pauseButton = document.querySelector("#pause-button");
 const restartButton = document.querySelector("#restart-button");
+const classicModeButton = document.querySelector("#classic-mode-button");
+const dailyChallengeButton = document.querySelector("#daily-challenge-button");
+const challengeSeedInput = document.querySelector("#challenge-seed-input");
+const seedChallengeButton = document.querySelector("#seed-challenge-button");
+const copySeedButton = document.querySelector("#copy-seed-button");
+const challengeNote = document.querySelector("#challenge-note");
 const settingsButton = document.querySelector("#settings-button");
 const settingsDialog = document.querySelector("#settings-dialog");
 const settingsForm = document.querySelector("#settings-form");
@@ -50,8 +74,11 @@ const keepColorToggle = document.querySelector("#keep-color-toggle");
 const settingsResetButton = document.querySelector("#settings-reset-button");
 const render = createRenderer(canvas);
 
-let settings = loadSettings();
-let state = createInitialState({ bestScore: loadBestScore(settings), mapId: settings.map });
+let playContext = readPlayContextFromUrl();
+const savedGame = loadSavedGame();
+
+let settings = savedGame?.settings ?? loadSettings();
+let state = savedGame ? restoreGameState(savedGame.state, playContext) : createGameState(playContext);
 let loopTimer = null;
 let resumeAfterSettings = false;
 
@@ -59,9 +86,10 @@ function setState(nextState, options = {}) {
   state = nextState;
 
   if (options.persistBestScore) {
-    saveBestScore(settings, state.bestScore);
+    saveCurrentBestScore();
   }
 
+  syncSavedGame(options);
   render(state, settings);
   updateHud();
 }
@@ -137,7 +165,7 @@ function restart() {
     setSettings({ ...settings, snakeColor: DEFAULT_SNAKE_COLOR_ID }, { reschedule: false });
   }
 
-  setState(resetGame(state, { bestScore: loadBestScore(settings), mapId: settings.map }));
+  setState(createGameState(playContext), { clearSavedGame: true });
   canvas.focus();
 }
 
@@ -158,8 +186,10 @@ function updateHud() {
   const speedOption = currentSpeedOption();
   const mode = getGameMode(settings.mode);
   const mapOption = currentMapOption();
+  const challengeMode = isChallengeMode();
 
   scoreValue.textContent = String(state.score);
+  bestLabel.textContent = challengeMode ? "Meilleur defi" : "Meilleur";
   bestValue.textContent = String(state.bestScore);
   modeValue.textContent = mode.label;
   speedValue.textContent = `${speedOption.label} ${(START_DELAY_MS / getTickDelay(state.score, speedOption.multiplier)).toFixed(1)}x`;
@@ -169,6 +199,154 @@ function updateHud() {
   pauseButton.disabled = state.status !== STATUS.RUNNING && state.status !== STATUS.PAUSED;
   pauseButton.textContent = state.status === STATUS.PAUSED ? "Reprendre" : "Pause";
   pauseButton.setAttribute("aria-pressed", String(state.status === STATUS.PAUSED));
+  classicModeButton.setAttribute("aria-pressed", String(!challengeMode));
+  dailyChallengeButton.setAttribute("aria-pressed", String(challengeMode && playContext.seed === getDailyChallengeSeed()));
+  copySeedButton.disabled = !challengeMode;
+  challengeNote.textContent = challengeMode ? `Defi ${playContext.seed}` : "Mode classique";
+}
+
+function createGameState(context) {
+  if (context.mode !== PLAY_CONTEXTS.CHALLENGE) {
+    return createInitialState({
+      bestScore: currentBestScore(context),
+      mapId: settings.map
+    });
+  }
+
+  return createInitialState({
+    bestScore: currentBestScore(context),
+    mapId: settings.map,
+    randomizer: createSeededRandomizer(context.seed)
+  });
+}
+
+function restoreGameState(snapshot, context) {
+  const randomizer = createRestoredRandomizer(context, snapshot);
+
+  return restoreState(snapshot, {
+    bestScore: currentBestScore(context),
+    mapId: settings.map,
+    ...(randomizer ? { randomizer } : {})
+  });
+}
+
+function currentBestScore(context) {
+  return context.mode === PLAY_CONTEXTS.CHALLENGE ? loadChallengeBestScore(context.seed) : loadBestScore(settings);
+}
+
+function createRestoredRandomizer(context, snapshot) {
+  if (context.mode !== PLAY_CONTEXTS.CHALLENGE) {
+    return null;
+  }
+
+  const randomizer = createSeededRandomizer(context.seed);
+  const generatedAppleCount = Number.isInteger(snapshot.score) ? snapshot.score + 1 : 0;
+
+  for (let index = 0; index < generatedAppleCount; index += 1) {
+    randomizer();
+  }
+
+  return randomizer;
+}
+
+function saveCurrentBestScore() {
+  if (isChallengeMode()) {
+    saveChallengeBestScore(playContext.seed, state.bestScore);
+    return;
+  }
+
+  saveBestScore(settings, state.bestScore);
+}
+
+function readPlayContextFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const seed = normalizeSeed(params.get("challenge"));
+
+  if (!seed) {
+    return { mode: PLAY_CONTEXTS.CLASSIC };
+  }
+
+  return { mode: PLAY_CONTEXTS.CHALLENGE, seed };
+}
+
+function switchToClassic() {
+  replaceUrl(null);
+  startContext({ mode: PLAY_CONTEXTS.CLASSIC });
+}
+
+function startDailyChallenge() {
+  const seed = getDailyChallengeSeed();
+  replaceUrl(seed);
+  startContext({ mode: PLAY_CONTEXTS.CHALLENGE, seed });
+}
+
+function startSeedChallenge() {
+  const seed = normalizeSeed(challengeSeedInput.value);
+
+  if (!seed) {
+    return;
+  }
+
+  replaceUrl(seed);
+  startContext({ mode: PLAY_CONTEXTS.CHALLENGE, seed });
+}
+
+function startContext(nextContext) {
+  clearTick();
+  playContext = nextContext;
+  syncChallengeSeedInput();
+  setState(createGameState(playContext), { clearSavedGame: true });
+  canvas.focus();
+}
+
+async function copyChallengeLink() {
+  if (!isChallengeMode()) {
+    return;
+  }
+
+  const shareUrl = buildChallengeUrl(playContext.seed).toString();
+
+  try {
+    await navigator.clipboard.writeText(shareUrl);
+    showTemporaryCopyLabel("Copie");
+  } catch {
+    challengeSeedInput.value = playContext.seed;
+    challengeSeedInput.select();
+    showTemporaryCopyLabel("Selectionne");
+  }
+}
+
+function showTemporaryCopyLabel(label) {
+  const initialLabel = copySeedButton.textContent;
+  copySeedButton.textContent = label;
+  window.setTimeout(() => {
+    copySeedButton.textContent = initialLabel;
+  }, 1200);
+}
+
+function syncChallengeSeedInput() {
+  challengeSeedInput.value = isChallengeMode() ? playContext.seed : getDailyChallengeSeed();
+}
+
+function replaceUrl(seed) {
+  const nextUrl = seed ? buildChallengeUrl(seed) : new URL(window.location.href);
+
+  if (!seed) {
+    nextUrl.searchParams.delete("challenge");
+  }
+
+  window.history.replaceState(null, "", nextUrl);
+}
+
+function buildChallengeUrl(seed) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("challenge", seed);
+
+  return url;
+}
+
+function isChallengeMode() {
+  return playContext.mode === PLAY_CONTEXTS.CHALLENGE;
 }
 
 function currentSpeedOption() {
@@ -251,12 +429,13 @@ function setSettings(nextSettings, options = {}) {
   if (scoreContextChanged) {
     resumeAfterSettings = false;
     clearTick();
-    setState(resetGame(state, { bestScore: loadBestScore(settings), mapId: settings.map }));
+    setState(createGameState(playContext), { clearSavedGame: true });
     return;
   }
 
   render(state, settings);
   updateHud();
+  syncSavedGame();
 
   if (reschedule && state.status === STATUS.RUNNING && !isSettingsOpen()) {
     clearTick();
@@ -372,9 +551,29 @@ function statusText(status) {
   }
 }
 
+function syncSavedGame(options = {}) {
+  if (options.clearSavedGame || state.status === STATUS.GAME_OVER || state.status === STATUS.WON) {
+    clearSavedGame();
+    return;
+  }
+
+  if (state.status === STATUS.RUNNING || state.status === STATUS.PAUSED) {
+    saveGameState(state, settings);
+  }
+}
+
 playButton.addEventListener("click", play);
 pauseButton.addEventListener("click", togglePause);
 restartButton.addEventListener("click", restart);
+classicModeButton.addEventListener("click", switchToClassic);
+dailyChallengeButton.addEventListener("click", startDailyChallenge);
+seedChallengeButton.addEventListener("click", startSeedChallenge);
+copySeedButton.addEventListener("click", copyChallengeLink);
+challengeSeedInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    startSeedChallenge();
+  }
+});
 settingsButton.addEventListener("click", openSettings);
 settingsForm.addEventListener("submit", (event) => {
   if (typeof settingsDialog.close !== "function") {
@@ -412,6 +611,7 @@ settingsDialog.addEventListener("click", (event) => {
 });
 
 populateSettingsControls();
+syncChallengeSeedInput();
 
 bindKeyboard(handleDirection, {
   shouldIgnore: isSettingsOpen
@@ -426,4 +626,5 @@ window.addEventListener("blur", () => {
 
 window.addEventListener("resize", () => render(state, settings));
 
-setState(queueDirection(state, DIRECTIONS.RIGHT));
+setState(state);
+scheduleTick();

@@ -39,12 +39,13 @@ button {
   margin: 0 auto;
   padding: clamp(16px, 4vw, 32px);
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   gap: 14px;
 }
 
 .top-bar,
 .score-strip,
+.challenge-panel,
 .control-strip {
   width: 100%;
 }
@@ -112,7 +113,9 @@ h1 {
 .color-choice:focus-visible,
 .settings-field select:focus-visible,
 .settings-toggle input:focus-visible,
-.control-button:focus-visible {
+.control-button:focus-visible,
+.mode-button:focus-visible,
+.seed-input:focus-visible {
   outline: 3px solid rgba(76, 201, 240, 0.35);
   outline-offset: 2px;
 }
@@ -149,6 +152,60 @@ h1 {
   overflow-wrap: anywhere;
   font-size: clamp(1.35rem, 5vw, 2.1rem);
   line-height: 1;
+}
+
+.challenge-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+  box-shadow: 0 16px 28px var(--shadow);
+}
+
+.mode-switch,
+.seed-controls {
+  display: grid;
+  gap: 8px;
+}
+
+.mode-switch {
+  grid-template-columns: 1fr 1fr;
+}
+
+.seed-controls {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+}
+
+.seed-label,
+.challenge-note {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.challenge-note {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.seed-input {
+  min-width: 0;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #14171a;
+  color: var(--ink);
+  padding: 0 12px;
+  font: inherit;
+}
+
+.seed-input:focus-visible {
+  border-color: var(--cyan);
 }
 
 .snake-color-field {
@@ -262,8 +319,8 @@ h1 {
   gap: 8px;
 }
 
-.control-button {
-  min-height: 48px;
+.control-button,
+.mode-button {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel-strong);
@@ -272,22 +329,38 @@ h1 {
   cursor: pointer;
 }
 
+.control-button {
+  min-height: 48px;
+}
+
+.mode-button {
+  min-height: 42px;
+}
+
 .control-button.primary {
   border-color: rgba(99, 220, 113, 0.55);
   background: #245833;
 }
 
-.control-button:hover:not(:disabled) {
+.control-button:hover:not(:disabled),
+.mode-button:hover:not(:disabled) {
   border-color: var(--cyan);
 }
 
-.control-button:active:not(:disabled) {
+.control-button:active:not(:disabled),
+.mode-button:active:not(:disabled) {
   transform: translateY(1px);
 }
 
-.control-button:disabled {
+.control-button:disabled,
+.mode-button:disabled {
   color: rgba(244, 247, 239, 0.36);
   cursor: not-allowed;
+}
+
+.mode-button[aria-pressed="true"] {
+  border-color: rgba(99, 220, 113, 0.55);
+  background: #245833;
 }
 
 .settings-dialog {
@@ -427,7 +500,11 @@ h1 {
   .score-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mode-switch,
+  .seed-controls {
+    grid-template-columns: 1fr;
   }
 
   .color-options {
